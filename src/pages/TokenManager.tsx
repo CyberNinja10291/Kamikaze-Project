@@ -9,7 +9,6 @@ import {
 
 import { findMetadataPda } from "@metaplex-foundation/js";
 import {
-  VStack,
   Text,
   Box,
   Button,
@@ -106,6 +105,10 @@ const TokenManager = () => {
   };
 
   const update = async () => {
+    if (!wallet || !wallet.connected) {
+      NotifyMessage("Connect the Wallet", "warning");
+      return;
+    }
     if (!tokenName || !tokenSymol || !metadataUrl || !selectedToken) {
       console.log("Fill all fields");
       NotifyMessage("Fill the token info!", "warning");
@@ -154,6 +157,10 @@ const TokenManager = () => {
   };
 
   const burnTokens = async (token: string, amount: number) => {
+    if (!wallet || !wallet.connected) {
+      NotifyMessage("Connect the Wallet", "warning");
+      return;
+    }
     if (!burnAmount) {
       NotifyMessage("Fill the burn amount!", "warning");
       return;
@@ -188,13 +195,12 @@ const TokenManager = () => {
   };
 
   return (
-    <Container maxW={"full"} paddingX={130}>
+    <Container maxW={{ base: "100%", md: "full" }} p={{ base: 2, md: 1 }}>
       <Box
-        // bg="purple.800"
         p={4}
         borderRadius="2xl"
         boxShadow="dark-lg"
-        paddingX={"100px"}
+        paddingX={"5%"}
         paddingBottom={"30px"}
       >
         <Flex
@@ -214,79 +220,66 @@ const TokenManager = () => {
             </Heading>
           </Flex>
 
-          <Text fontSize="md" marginTop={"10px"}>
+          <Text fontSize="md" display={{ base: "none", md: "block" }}>
             Begin the seamless process of updating your SPL token's metadata to
             ensure that your token's information remains accurate and up to date
             with the latest details
           </Text>
         </Flex>
-        <VStack spacing="4">
-          <VStack
-            spacing={4}
-            p={5}
-            borderRadius="lg"
-            boxShadow="md"
-            width="100%"
-            alignItems="stretch"
+        <Flex flexDirection={"column"} gap={4}>
+          <Select
+            placeholder="Select Token"
+            value={selectedToken}
+            onChange={(e) => selectTokenHanlder(e.target.value)}
+            variant="filled"
+            color="purple.700"
           >
-            <Box width="full">
-              <Select
-                placeholder="Select Token"
-                value={selectedToken}
-                onChange={(e) => selectTokenHanlder(e.target.value)}
-                variant="filled"
-                color="purple.700"
-              >
-                {tokenList.map((item, key) => (
-                  <option value={item.token} key={key}>
-                    {item.token}
-                  </option>
-                ))}
-              </Select>
-            </Box>
-            <VStack spacing="2">
-              <Input
-                placeholder="Type your new token name"
-                onChange={(e) => setTokenName(e.target.value)}
-              ></Input>
-              <Input
-                placeholder="Type your new token symbol"
-                onChange={(e) => setTokenSymol(e.target.value)}
-              ></Input>
-              <Input
-                placeholder="Type your new meatdata Url"
-                onChange={(e) => setMetadataUrl(e.target.value)}
-              ></Input>
-            </VStack>
-            <Button colorScheme="green" variant="solid" onClick={update}>
-              Update
-            </Button>
-            <Text fontSize="xl">Burn Tokens</Text>
-            <Box display={"flex"} justifyContent={"space-evenly"}>
-              <Text fontSize="md" color="purple.200">
-                Name: {selectedTokenName}
-              </Text>
-              <Text fontSize="md" color="purple.200">
-                Symbol: {selectedTokenSymbol}
-              </Text>
-              <Text fontSize="md" color="purple.200">
-                Balance: {selectedTokenAmount}
-              </Text>
-            </Box>
-            <Input
-              type="number"
-              placeholder="Type your token amount to burn"
-              onChange={(e) => setBurnAmount(e.target.value)}
-            ></Input>
-            <Button
-              colorScheme="green"
-              variant="solid"
-              onClick={() => burnTokens(selectedToken, Number(burnAmount))}
-            >
-              Burn
-            </Button>
-          </VStack>
-        </VStack>
+            {tokenList.map((item, key) => (
+              <option value={item.token} key={key}>
+                {item.token}
+              </option>
+            ))}
+          </Select>
+          <Input
+            placeholder="Type your new token name"
+            onChange={(e) => setTokenName(e.target.value)}
+          ></Input>
+          <Input
+            placeholder="Type your new token symbol"
+            onChange={(e) => setTokenSymol(e.target.value)}
+          ></Input>
+          <Input
+            placeholder="Type your new meatdata Url"
+            onChange={(e) => setMetadataUrl(e.target.value)}
+          ></Input>
+          <Button colorScheme="green" variant="solid" onClick={update}>
+            Update
+          </Button>
+          <Text>Burn Tokens</Text>
+          <Box display={"flex"} justifyContent={"space-evenly"}>
+            <Text fontSize="md" color="purple.200">
+              Name: {selectedTokenName}
+            </Text>
+            <Text fontSize="md" color="purple.200">
+              Symbol: {selectedTokenSymbol}
+            </Text>
+            <Text fontSize="md" color="purple.200">
+              Balance: {selectedTokenAmount}
+            </Text>
+          </Box>
+          <Input
+            type="number"
+            placeholder="Type your token amount to burn"
+            onChange={(e) => setBurnAmount(e.target.value)}
+          ></Input>
+          <Button
+            colorScheme="green"
+            variant="solid"
+            onClick={() => burnTokens(selectedToken, Number(burnAmount))}
+          >
+            Burn
+          </Button>
+        </Flex>
       </Box>
     </Container>
   );

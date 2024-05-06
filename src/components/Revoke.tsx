@@ -25,8 +25,10 @@ export const RevokeAuthority = ({
       marginBottom="10px"
       width="100%"
     >
-      <Text fontSize="xl">{title}</Text>
-      <Text fontSize="md">{subTitle}</Text>
+      <Text fontSize="lg">{title}</Text>
+      <Text fontSize="md" display={{ base: "none", sm: "block" }}>
+        {subTitle}
+      </Text>
       <Box width="full">
         <Select
           placeholder="Select Token"

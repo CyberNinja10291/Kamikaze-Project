@@ -66,6 +66,10 @@ const Tokens = () => {
 
   const revoke = async (option: Option) => {
     try {
+      if (!wallet || !wallet.connected) {
+        NotifyMessage("Connect the Wallet", "warning");
+        return;
+      }
       const mintAddress = option ? revokeMintToken : revokeFreezeToken;
       if (!mintAddress) {
         return;
@@ -110,12 +114,12 @@ const Tokens = () => {
   };
 
   return (
-    <Container maxW={"full"} paddingX={130}>
+    <Container maxW={{ base: "100%", md: "full" }} p={{ base: 2, md: 1 }}>
       <Box
         p={4}
         borderRadius="2xl"
         boxShadow="dark-lg"
-        paddingX={"100px"}
+        paddingX={"5%"}
         paddingBottom={"30px"}
       >
         <Flex
@@ -135,13 +139,12 @@ const Tokens = () => {
             </Heading>
           </Flex>
 
-          <Text fontSize="md">
+          <Text fontSize="md" display={{ base: "none", md: "block" }}>
             Begin the seamless process of revoke your SPL token's authority
           </Text>
         </Flex>
         <VStack
-          spacing={4}
-          p={5}
+          spacing={3}
           borderRadius="lg"
           boxShadow="md"
           width="100%"

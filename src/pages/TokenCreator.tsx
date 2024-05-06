@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { WebIrys } from "@irys/sdk";
 
-import { useToast } from "@chakra-ui/react";
+import { Stack, useToast } from "@chakra-ui/react";
 import {
   Keypair,
   SystemProgram,
@@ -28,14 +28,14 @@ import {
   FormLabel,
   Input,
   Button,
-  VStack,
-  HStack,
+  SimpleGrid,
   Container,
   Textarea,
   Flex,
   Heading,
   Text,
   Switch,
+  Spinner,
 } from "@chakra-ui/react";
 import { AttachmentIcon } from "@chakra-ui/icons";
 // import { notify } from "../utils/notifications";
@@ -64,6 +64,7 @@ function TokenCreator() {
 
   const [revokeUpdate, setRevokeUpdate] = useState(false);
   const [socialLink, setSocialLink] = useState(false);
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     if (wallet && wallet.connected) {
@@ -97,6 +98,11 @@ function TokenCreator() {
   };
   const handleCreateToken = async () => {
     try {
+      if (!wallet || !wallet.connected) {
+        NotifyMessage("Connect the Wallet", "warning");
+        return;
+      }
+      setLoading(true);
       console.log("Handle Create TOken");
       console.log("connection", connection);
       console.log("balance", await connection.getBalance(wallet.publicKey));
@@ -187,6 +193,8 @@ function TokenCreator() {
       const tx = await sendTransaction(createNewTokenTransaction, connection, {
         signers: [mintKeypair],
       });
+      setLoading(false);
+
       NotifyMessage(
         `Created Token. Token address: ${mintKeypair.publicKey.toBase58()}`
       );
@@ -196,6 +204,7 @@ function TokenCreator() {
       console.log("Transaction completed", tx);
     } catch (error) {
       console.log("error", error);
+      setLoading(false);
     }
   };
 
@@ -226,7 +235,7 @@ function TokenCreator() {
     // const rpcUrl = "https://api.devnet.solana.com"; // Required for devnet
     const rpcUrl =
       "https://mainnet.helius-rpc.com/?api-key=ee528ad2-b235-4251-9cc1-a1cf7ec3e06e";
-
+    //   "https://devnet.helius-rpc.com/?api-key=ee528ad2-b235-4251-9cc1-a1cf7ec3e06e";
     // Create a wallet object
     const wallet = { rpcUrl: rpcUrl, name: "ethersv5", provider: provider };
     // Use the wallet object
@@ -248,6 +257,10 @@ function TokenCreator() {
     console.log(
       `Upload success content URL= https://gateway.irys.xyz/${tx.id}`
     );
+    NotifyMessage(
+      `Upload success content URL= https://gateway.irys.xyz/${tx.id}`,
+      "success"
+    );
     return `https://gateway.irys.xyz/${tx.id}`;
   };
 
@@ -262,23 +275,22 @@ function TokenCreator() {
       if (discord != "") extensions["discord"] = discord;
     }
 
-    const content = {
+    let content = {
       name: tokenName,
       symbol: tokenSymbol,
       description: description,
       image: imageUrl,
     };
+    if (Object.keys(extensions).length != 0) {
+      content["extentions"] = extensions;
+    }
     console.log("content", content);
     const jsonContent = JSON.stringify(content, null, 4);
     const buffer = new TextEncoder().encode(jsonContent).buffer;
     const metadataUrl = await uploadData(Buffer.from(buffer), "json");
-    //   "https://arweave.net/nnKTsIJD4_TouHQCEaz6R1XsjbpQjMlpleLxBI6bX3Y"; //await uploadData(Buffer.from(buffer), "json");
 
     console.log("imageUrl", imageUrl);
     console.log("metadataUrl", metadataUrl);
-
-    NotifyMessage(`Image uploaded. /n imageUrl: ${imageUrl}`);
-    NotifyMessage(`Image uploaded. /n imageUrl: ${metadataUrl}`);
 
     return {
       tokenName: tokenName,
@@ -289,13 +301,12 @@ function TokenCreator() {
     };
   };
   return (
-    <Container maxW={"full"} paddingX={130}>
+    <Container maxW={{ base: "100%", md: "full" }} p={{ base: 2, md: 1 }}>
       <Box
-        // bg="purple.800"
         p={4}
         borderRadius="2xl"
         boxShadow="dark-lg"
-        paddingX={"100px"}
+        paddingX={"5%"}
         paddingBottom={"30px"}
       >
         <Flex
@@ -315,94 +326,94 @@ function TokenCreator() {
             </Heading>
           </Flex>
 
-          <Text fontSize="md">
+          <Text fontSize="md" display={{ base: "none", md: "block" }}>
             The perfect tool to create Solana SPL tokens. Simple, user friendly,
             and fast.
           </Text>
         </Flex>
-        <VStack spacing={4} align="stretch">
-          <HStack align="top" spacing={"7"}>
-            <FormControl>
-              <FormLabel>Name</FormLabel>
-              <Input
-                placeholder="Name"
-                onChange={(e) => setTokenName(e.target.value)}
-              />
-            </FormControl>
-            <FormControl>
-              <FormLabel>Symbol</FormLabel>
-              <Input
-                placeholder="Symbol"
-                onChange={(e) => setTokenSymbol(e.target.value)}
-              />
-            </FormControl>
-          </HStack>
-          <HStack align="top" spacing={"7"}>
-            <FormControl>
-              <FormLabel>Decimals</FormLabel>
-              <Input
-                placeholder="Decimals"
-                type="number"
-                value={decimals}
-                onChange={(e) => setDecimals(e.target.value)}
-              />
-            </FormControl>
-            <FormControl>
-              <FormLabel>Supply</FormLabel>
-              <Input
-                placeholder="Supply"
-                type="number"
-                onChange={(e) => setAmount(e.target.value)}
-              />
-            </FormControl>
-          </HStack>
-
-          <HStack height={"200px"} alignItems={"stretch"} spacing={"7"}>
-            <FormControl display={"flex"} flexDirection={"column"}>
-              <FormLabel>Image</FormLabel>
-              <Input
-                type="file"
-                accept="image/*" // Optionally, specify the types of images accepted
-                onChange={(e) => handleImageChange(e)} // Replace with your method to handle file selection
-                id="images"
-                name="images"
-                hidden
-              />
-              <FormLabel
-                htmlFor="images"
-                border={"1px solid #A2A8A0"}
-                borderRadius={"5px"}
-                alignItems={"center"}
-                justifyContent={"center"}
-                display={"flex"}
-                flex={"1"}
-                margin={"0"}
-              >
-                {!imagePreview ? (
-                  <AttachmentIcon />
-                ) : (
-                  <img src={imagePreview} width={"150px"} />
-                )}
-              </FormLabel>
-            </FormControl>
-            <FormControl display={"flex"} flexDirection={"column"}>
-              <FormLabel>Description(Optional)</FormLabel>
-              <Textarea
-                placeholder="Put the description of the Token"
-                flex={"1"}
-                onChange={(e) => setDescription(e.target.value)}
-              />
-            </FormControl>
-          </HStack>
-          <FormControl display={"flex"}>
-            <FormLabel htmlFor="isRequired">Add Social Links :</FormLabel>
-            <Switch
-              id="isRequired"
-              isRequired
-              onChange={(e) => setSocialLink(e.target.checked)}
+        <SimpleGrid columns={{ base: 1, md: 2 }} spacing={4}>
+          <FormControl>
+            <FormLabel>Name</FormLabel>
+            <Input
+              placeholder="Name"
+              onChange={(e) => setTokenName(e.target.value)}
             />
           </FormControl>
-          <HStack align="top" spacing={"7"} hidden={!socialLink}>
+          <FormControl>
+            <FormLabel>Symbol</FormLabel>
+            <Input
+              placeholder="Symbol"
+              onChange={(e) => setTokenSymbol(e.target.value)}
+            />
+          </FormControl>
+          <FormControl>
+            <FormLabel>Decimals</FormLabel>
+            <Input
+              placeholder="Decimals"
+              type="number"
+              value={decimals}
+              onChange={(e) => setDecimals(e.target.value)}
+            />
+          </FormControl>
+          <FormControl>
+            <FormLabel>Supply</FormLabel>
+            <Input
+              placeholder="Supply"
+              type="number"
+              onChange={(e) => setAmount(e.target.value)}
+            />
+          </FormControl>
+
+          <FormControl display={"flex"} flexDirection={"column"}>
+            <FormLabel>Image</FormLabel>
+            <Input
+              type="file"
+              accept="image/*" // Optionally, specify the types of images accepted
+              onChange={(e) => handleImageChange(e)} // Replace with your method to handle file selection
+              id="images"
+              name="images"
+              hidden
+            />
+            <FormLabel
+              htmlFor="images"
+              border={"1px solid #A2A8A0"}
+              borderRadius={"5px"}
+              alignItems={"center"}
+              justifyContent={"center"}
+              display={"flex"}
+              height={"200px"}
+              margin={"0"}
+            >
+              {!imagePreview ? (
+                <AttachmentIcon />
+              ) : (
+                <img
+                  src={imagePreview}
+                  width={"150px"}
+                  style={{ maxHeight: "100%" }}
+                />
+              )}
+            </FormLabel>
+          </FormControl>
+          <FormControl display={"flex"} flexDirection={"column"}>
+            <FormLabel>Description(Optional)</FormLabel>
+            <Textarea
+              placeholder="Put the description of the Token"
+              height={"200px"}
+              onChange={(e) => setDescription(e.target.value)}
+            />
+          </FormControl>
+        </SimpleGrid>
+        <FormControl display={"flex"}>
+          <FormLabel htmlFor="isRequired">Add Social Links :</FormLabel>
+          <Switch
+            id="isRequired"
+            isRequired
+            onChange={(e) => setSocialLink(e.target.checked)}
+          />
+        </FormControl>
+        {socialLink && (
+          <SimpleGrid columns={{ base: 1, md: 4 }} spacing={4}>
             <FormControl>
               <FormLabel>Website</FormLabel>
               <Input
@@ -439,22 +450,40 @@ function TokenCreator() {
                 onChange={(e) => setDiscord(e.target.value)}
               />
             </FormControl>
-          </HStack>
-          <FormControl display={"flex"}>
-            <FormLabel htmlFor="isRequired">
-              Revoke Update (Immutable)
-            </FormLabel>
-            <Switch
-              id="isRequired"
-              isRequired
-              onChange={(e) => setRevokeUpdate(e.target.checked)}
-            />
-          </FormControl>
-          <Button colorScheme="green" onClick={() => handleCreateToken()}>
-            Create Token
-          </Button>
-        </VStack>
+          </SimpleGrid>
+        )}
+        <FormControl display={"flex"} marginY={"25px"}>
+          <FormLabel htmlFor="isRequired">Revoke Update (Immutable)</FormLabel>
+          <Switch
+            id="isRequired"
+            isRequired
+            onChange={(e) => setRevokeUpdate(e.target.checked)}
+          />
+        </FormControl>
+        <Button colorScheme="green" onClick={() => handleCreateToken()}>
+          Create Token
+        </Button>
       </Box>
+      {loading && (
+        <Stack
+          width={"100%"}
+          height={"100%"}
+          position={"absolute"}
+          top={0}
+          left={0}
+          background={"#666666aa"}
+          alignItems={"center"}
+          pt={"40%"}
+        >
+          <Spinner
+            thickness="4px"
+            speed="0.65s"
+            emptyColor="gray.200"
+            color="blue.500"
+            size="xl"
+          />
+        </Stack>
+      )}
     </Container>
   );
 }
