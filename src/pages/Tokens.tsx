@@ -72,6 +72,7 @@ const Tokens = () => {
       }
       const mintAddress = option ? revokeMintToken : revokeFreezeToken;
       if (!mintAddress) {
+        NotifyMessage("Please Select the token", "warning");
         return;
       }
 

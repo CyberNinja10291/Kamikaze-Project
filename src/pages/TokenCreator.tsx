@@ -102,7 +102,6 @@ function TokenCreator() {
         NotifyMessage("Connect the Wallet", "warning");
         return;
       }
-      setLoading(true);
       console.log("Handle Create TOken");
       console.log("connection", connection);
       console.log("balance", await connection.getBalance(wallet.publicKey));
@@ -118,6 +117,7 @@ function TokenCreator() {
         NotifyMessage("Fill the all of the fields");
         return;
       }
+      setLoading(true);
       const info = await configureMetadata();
       console.log("Info", info);
       const from = wallet;

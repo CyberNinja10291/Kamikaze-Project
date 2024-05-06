@@ -111,7 +111,7 @@ const TokenManager = () => {
     }
     if (!tokenName || !tokenSymol || !metadataUrl || !selectedToken) {
       console.log("Fill all fields");
-      NotifyMessage("Fill the token info!", "warning");
+      NotifyMessage("Fill the token info", "warning");
       return;
     }
     const from = wallet;
