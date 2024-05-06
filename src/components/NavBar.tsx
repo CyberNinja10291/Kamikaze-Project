@@ -18,18 +18,17 @@ const Navbar = () => {
       marginBottom={"20px"}
     >
       <Flex align={"center"} mr={5}>
-        {/* <FaEthereum /> */}
-        <Box ml={3} fontWeight="bold">
+        <Box ml={3} fontWeight="bold" fontSize={"xx-large"}>
           Kamikaze
         </Box>
       </Flex>
 
       <Flex align={"center"} justify={"center"}>
-        <Link href="/tokens" px={2}>
-          Tokens
-        </Link>
         <Link href="/tokens/create" px={3}>
           Create Token
+        </Link>
+        <Link href="/tokens" px={3}>
+          Tokens
         </Link>
         <Link href="/tokens/manage" px={3}>
           Manage Token

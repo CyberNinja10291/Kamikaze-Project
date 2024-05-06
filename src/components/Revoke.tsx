@@ -21,25 +21,18 @@ export const RevokeAuthority = ({
     <VStack
       spacing={4}
       p={5}
-      backgroundColor="purple.800"
       borderRadius="lg"
-      boxShadow="md"
       marginBottom="10px"
       width="100%"
     >
-      <Text fontSize="xl" color="white">
-        {title}
-      </Text>
-      <Text fontSize="md" color="purple.200">
-        {subTitle}
-      </Text>
+      <Text fontSize="xl">{title}</Text>
+      <Text fontSize="md">{subTitle}</Text>
       <Box width="full">
         <Select
           placeholder="Select Token"
           value={selectedToken}
           onChange={(e) => onSelectToken(e.target.value)}
           variant="filled"
-          color="purple.700"
         >
           {tokenList.map((token, key) => (
             <option value={token} key={key}>
@@ -48,7 +41,7 @@ export const RevokeAuthority = ({
           ))}
         </Select>
       </Box>
-      <Button colorScheme="blue" variant="solid" onClick={onRevokeAuthority}>
+      <Button colorScheme="green" variant="solid" onClick={onRevokeAuthority}>
         {button}
       </Button>
     </VStack>

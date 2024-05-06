@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
-import { WebBundlr } from "@bundlr-network/client";
+import { WebIrys } from "@irys/sdk";
+
 import { useToast } from "@chakra-ui/react";
 import {
   Keypair,
@@ -26,7 +27,6 @@ import {
   FormControl,
   FormLabel,
   Input,
-  FormErrorMessage,
   Button,
   VStack,
   HStack,
@@ -35,9 +35,10 @@ import {
   Flex,
   Heading,
   Text,
+  Switch,
 } from "@chakra-ui/react";
 import { AttachmentIcon } from "@chakra-ui/icons";
-import { notify } from "../utils/notifications";
+// import { notify } from "../utils/notifications";
 function TokenCreator() {
   const toast = useToast();
   const wallet = useWallet();
@@ -56,7 +57,13 @@ function TokenCreator() {
   const [provider, setProvider] = useState(null);
   const [account, setAccount] = useState("");
 
-  let bundlr: WebBundlr | null = null;
+  const [website, setWebsite] = useState("");
+  const [twitter, setTwitter] = useState("");
+  const [telegram, setTelegram] = useState("");
+  const [discord, setDiscord] = useState("");
+
+  const [revokeUpdate, setRevokeUpdate] = useState(false);
+  const [socialLink, setSocialLink] = useState(false);
 
   useEffect(() => {
     if (wallet && wallet.connected) {
@@ -83,13 +90,14 @@ function TokenCreator() {
       title: "Notification",
       description: message,
       status: status, // Can be "success", "error", "warning", or "info"
-      duration: 2000,
+      duration: 5000,
       isClosable: true,
       position: "top", // Can be any valid position
     });
   };
   const handleCreateToken = async () => {
     try {
+      console.log("Handle Create TOken");
       console.log("connection", connection);
       console.log("balance", await connection.getBalance(wallet.publicKey));
       if (
@@ -100,20 +108,19 @@ function TokenCreator() {
         !description ||
         !imagePreview
       ) {
+        console.log("Notify");
         NotifyMessage("Fill the all of the fields");
         return;
       }
-
       const info = await configureMetadata();
+      console.log("Info", info);
       const from = wallet;
-
       const mintKeypair = Keypair.generate();
       const tokenATA = await getAssociatedTokenAddress(
         mintKeypair.publicKey,
         from.publicKey
       );
       const lamports = await getMinimumBalanceForRentExemptMint(connection);
-
       const createMetadataInstruction =
         createCreateMetadataAccountV3Instruction(
           {
@@ -142,12 +149,11 @@ function TokenCreator() {
                 uses: null,
                 collection: null,
               },
-              isMutable: true,
+              isMutable: !revokeUpdate,
               collectionDetails: null,
             },
           }
         );
-
       const createNewTokenTransaction = new Transaction().add(
         SystemProgram.createAccount({
           fromPubkey: from.publicKey,
@@ -163,14 +169,12 @@ function TokenCreator() {
           from.publicKey,
           TOKEN_PROGRAM_ID
         ),
-
         createAssociatedTokenAccountInstruction(
           from.publicKey,
           tokenATA,
           from.publicKey,
           mintKeypair.publicKey
         ),
-
         createMintToInstruction(
           mintKeypair.publicKey,
           tokenATA,
@@ -186,7 +190,10 @@ function TokenCreator() {
       NotifyMessage(
         `Created Token. Token address: ${mintKeypair.publicKey.toBase58()}`
       );
-      console.log("Transaction complted", tx);
+      console.log(
+        `Created Token. Token address: ${mintKeypair.publicKey.toBase58()}`
+      );
+      console.log("Transaction completed", tx);
     } catch (error) {
       console.log("error", error);
     }
@@ -203,131 +210,76 @@ function TokenCreator() {
           const preview = URL.createObjectURL(blob);
           setImagePreview(preview);
           setImageFile(Buffer.from(reader.result as ArrayBuffer));
+          console.log("ImageFile", imageFile);
         }
       };
       reader.readAsArrayBuffer(files[0]);
     }
   };
 
-  const initializeBundlr = async (): Promise<WebBundlr> => {
-    try {
-      const bundlrs = [
-        {
-          id: 1,
-          network: "mainnet-beta",
-          name: "https://node1.bundlr.network",
-        },
-        { id: 2, network: "devnet", name: "https://devnet.bundlr.network" },
-      ];
-      const selected = bundlrs[1];
-      // initialise a bundlr client
-      console.log("Name", selected.name);
-      console.log("provider", provider);
-      if (!provider) return;
-      if (selected.name === "https://devnet.bundlr.network") {
-        bundlr = new WebBundlr(`${selected.name}`, "solana", provider, {
-          providerUrl: "https://api.devnet.solana.com",
-        });
-      } else {
-        bundlr = new WebBundlr(`${selected.name}`, "solana", provider);
-      }
+  const uploadData = async (
+    data: Buffer,
+    type: "image" | "json"
+  ): Promise<string> => {
+    const network = "mainnet";
+    const token = "solana";
+    // const rpcUrl = "https://api.devnet.solana.com"; // Required for devnet
+    const rpcUrl =
+      "https://mainnet.helius-rpc.com/?api-key=ee528ad2-b235-4251-9cc1-a1cf7ec3e06e";
 
-      console.log(bundlr);
+    // Create a wallet object
+    const wallet = { rpcUrl: rpcUrl, name: "ethersv5", provider: provider };
+    // Use the wallet object
+    const webIrys = new WebIrys({ network, token, wallet });
+    await webIrys.ready();
 
-      try {
-        // Check for valid bundlr node
-        await bundlr.utils.getBundlerAddress("solana");
-      } catch (err) {
-        notify({ type: "error", message: `${err}` });
-        return;
-      }
-      try {
-        await bundlr.ready();
-      } catch (err) {
-        notify({ type: "error", message: `${err}` });
-        return;
-      } //@ts-ignore
-      if (!bundlr.address) {
-        notify({
-          type: "error",
-          message: "Unexpected error: bundlr address not found",
-        });
-      }
-      notify({
-        type: "success",
-        message: `Connected to ${selected.network}`,
-      });
-      return bundlr;
-    } catch (error) {
-      console.log(error);
-      return null;
-    }
-  };
+    console.log("Size", data.length);
+    const size = data.length;
 
-  const uploadImage = async () => {
-    console.log("ImageFile", imageFile);
-    const price = await bundlr.utils.getPrice("solana", imageFile.length);
-    let amount = Number(bundlr.utils.unitConverter(price));
+    // fund (if needed)
+    const price = await webIrys.getPrice(size);
+    await webIrys.fund(price);
 
-    const loadedBalance = await bundlr.getLoadedBalance();
-    let balance = Number(bundlr.utils.unitConverter(loadedBalance.toNumber()));
+    const value = type == "image" ? "image/png" : "application/json";
+    const tx = await webIrys.upload(data, {
+      tags: [{ name: "Content-Type", value: value }],
+    });
 
-    console.log(amount, balance);
-
-    if (balance < amount) {
-      // await bundlr.fund(LAMPORTS_PER_SOL);
-      await bundlr.fund(Number(amount * 1e9));
-    }
-
-    const imageResult = await bundlr.uploader.upload(imageFile, [
-      { name: "Content-Type", value: "image/png" },
-    ]);
-    const arweaveImageUrl = `https://arweave.net/${imageResult.data.id}?ext=png`;
-    console.log("image url", arweaveImageUrl);
-    if (arweaveImageUrl) {
-      NotifyMessage(arweaveImageUrl);
-    }
-    return arweaveImageUrl;
-  };
-
-  const uploadMetadata = async (data: any): Promise<String> => {
-    console.log("start upload metaData");
-    const price = await bundlr.utils.getPrice("solana", data.length);
-    let amount = Number(bundlr.utils.unitConverter(price));
-    // amount = Number(amount);
-
-    const loadedBalance = await bundlr.getLoadedBalance();
-    let balance = Number(bundlr.utils.unitConverter(loadedBalance.toNumber()));
-
-    if (balance < amount) {
-      await bundlr.fund(amount);
-    }
-
-    const metadataResult = await bundlr.uploader.upload(data, [
-      { name: "Content-Type", value: "application/json" },
-    ]);
-    const arweaveMetadataUrl = `https://arweave.net/${metadataResult.data.id}`;
-
-    NotifyMessage(arweaveMetadataUrl);
-    return arweaveMetadataUrl;
+    console.log(
+      `Upload success content URL= https://gateway.irys.xyz/${tx.id}`
+    );
+    return `https://gateway.irys.xyz/${tx.id}`;
   };
 
   const configureMetadata = async () => {
-    await initializeBundlr();
-    const url = await uploadImage();
-    NotifyMessage(`Image uploaded. /n imageUrl: ${url}`);
+    const imageUrl = await uploadData(imageFile, "image");
+
+    let extensions = {};
+    if (socialLink) {
+      if (website != "") extensions["website"] = website;
+      if (twitter != "") extensions["twitter"] = twitter;
+      if (telegram != "") extensions["telegram"] = telegram;
+      if (discord != "") extensions["discord"] = discord;
+    }
+
     const content = {
       name: tokenName,
       symbol: tokenSymbol,
       description: description,
-      image: url,
+      image: imageUrl,
     };
     console.log("content", content);
     const jsonContent = JSON.stringify(content, null, 4);
     const buffer = new TextEncoder().encode(jsonContent).buffer;
+    const metadataUrl = await uploadData(Buffer.from(buffer), "json");
+    //   "https://arweave.net/nnKTsIJD4_TouHQCEaz6R1XsjbpQjMlpleLxBI6bX3Y"; //await uploadData(Buffer.from(buffer), "json");
 
-    const metadataUrl = await uploadMetadata(Buffer.from(buffer));
-    NotifyMessage(`metadataUrl: ${metadataUrl}`);
+    console.log("imageUrl", imageUrl);
+    console.log("metadataUrl", metadataUrl);
+
+    NotifyMessage(`Image uploaded. /n imageUrl: ${imageUrl}`);
+    NotifyMessage(`Image uploaded. /n imageUrl: ${metadataUrl}`);
+
     return {
       tokenName: tokenName,
       tokenSymbol: tokenSymbol,
@@ -337,13 +289,14 @@ function TokenCreator() {
     };
   };
   return (
-    <Container maxW={"full"} padding={0}>
+    <Container maxW={"full"} paddingX={130}>
       <Box
-        bg="purple.800"
+        // bg="purple.800"
         p={4}
         borderRadius="2xl"
         boxShadow="dark-lg"
-        color="white"
+        paddingX={"100px"}
+        paddingBottom={"30px"}
       >
         <Flex
           as="nav"
@@ -352,7 +305,6 @@ function TokenCreator() {
           wrap="wrap"
           paddingY="1.5"
           paddingX="6"
-          color="white"
           boxShadow="sm"
           borderRadius="lg"
           marginBottom="20px"
@@ -363,34 +315,30 @@ function TokenCreator() {
             </Heading>
           </Flex>
 
-          <Box>
-            <Text fontSize="sm" opacity="0.8">
-              The perfect tool to create Solana SPL tokens. Simple, user
-              friendly, and fast.
-            </Text>
-          </Box>
+          <Text fontSize="md">
+            The perfect tool to create Solana SPL tokens. Simple, user friendly,
+            and fast.
+          </Text>
         </Flex>
         <VStack spacing={4} align="stretch">
-          <HStack align="top">
-            <FormControl isInvalid={!tokenName}>
+          <HStack align="top" spacing={"7"}>
+            <FormControl>
               <FormLabel>Name</FormLabel>
               <Input
                 placeholder="Name"
                 onChange={(e) => setTokenName(e.target.value)}
               />
-              <FormErrorMessage>Name is required</FormErrorMessage>
             </FormControl>
-            <FormControl isInvalid={!tokenSymbol}>
+            <FormControl>
               <FormLabel>Symbol</FormLabel>
               <Input
                 placeholder="Symbol"
                 onChange={(e) => setTokenSymbol(e.target.value)}
               />
-              <FormErrorMessage>Symbol is required</FormErrorMessage>
             </FormControl>
           </HStack>
-          <HStack>
-            <FormControl isInvalid={!decimals}>
+          <HStack align="top" spacing={"7"}>
+            <FormControl>
               <FormLabel>Decimals</FormLabel>
               <Input
                 placeholder="Decimals"
@@ -398,9 +346,19 @@ function TokenCreator() {
                 value={decimals}
                 onChange={(e) => setDecimals(e.target.value)}
               />
-              <FormErrorMessage>Decimal is required</FormErrorMessage>
             </FormControl>
-            <Box>
+            <FormControl>
+              <FormLabel>Supply</FormLabel>
+              <Input
+                placeholder="Supply"
+                type="number"
+                onChange={(e) => setAmount(e.target.value)}
+              />
+            </FormControl>
+          </HStack>
+
+          <HStack height={"200px"} alignItems={"stretch"} spacing={"7"}>
+            <FormControl display={"flex"} flexDirection={"column"}>
               <FormLabel>Image</FormLabel>
               <Input
                 type="file"
@@ -412,39 +370,87 @@ function TokenCreator() {
               />
               <FormLabel
                 htmlFor="images"
-                border={"1px solid #E2E8F0"}
+                border={"1px solid #A2A8A0"}
                 borderRadius={"5px"}
                 alignItems={"center"}
                 justifyContent={"center"}
                 display={"flex"}
-                boxSize={"100px"}
+                flex={"1"}
+                margin={"0"}
               >
                 {!imagePreview ? (
                   <AttachmentIcon />
                 ) : (
-                  <img src={imagePreview} width="150px" />
+                  <img src={imagePreview} width={"150px"} />
                 )}
               </FormLabel>
-            </Box>
+            </FormControl>
+            <FormControl display={"flex"} flexDirection={"column"}>
+              <FormLabel>Description(Optional)</FormLabel>
+              <Textarea
+                placeholder="Put the description of the Token"
+                flex={"1"}
+                onChange={(e) => setDescription(e.target.value)}
+              />
+            </FormControl>
           </HStack>
-          <FormControl isInvalid={!amount}>
-            <FormLabel>Supply</FormLabel>
-            <Input
-              placeholder="Supply"
-              type="number"
-              onChange={(e) => setAmount(e.target.value)}
+          <FormControl display={"flex"}>
+            <FormLabel htmlFor="isRequired">Add Social Links :</FormLabel>
+            <Switch
+              id="isRequired"
+              isRequired
+              onChange={(e) => setSocialLink(e.target.checked)}
             />
-            <FormErrorMessage>Amount is required</FormErrorMessage>
           </FormControl>
-          <FormControl isInvalid={!description}>
-            <FormLabel>Description</FormLabel>
-            <Textarea
-              placeholder="Description"
-              onChange={(e) => setDescription(e.target.value)}
+          <HStack align="top" spacing={"7"} hidden={!socialLink}>
+            <FormControl>
+              <FormLabel>Website</FormLabel>
+              <Input
+                placeholder="Put your website"
+                type="text"
+                value={website}
+                onChange={(e) => setWebsite(e.target.value)}
+              />
+            </FormControl>
+            <FormControl>
+              <FormLabel>Twitter</FormLabel>
+              <Input
+                placeholder="Put your Twitter"
+                type="text"
+                value={twitter}
+                onChange={(e) => setTwitter(e.target.value)}
+              />
+            </FormControl>
+            <FormControl>
+              <FormLabel>Telegram</FormLabel>
+              <Input
+                placeholder="Put your telegram"
+                type="text"
+                value={telegram}
+                onChange={(e) => setTelegram(e.target.value)}
+              />
+            </FormControl>
+            <FormControl>
+              <FormLabel>Discord</FormLabel>
+              <Input
+                placeholder="Put your discord"
+                type="text"
+                value={discord}
+                onChange={(e) => setDiscord(e.target.value)}
+              />
+            </FormControl>
+          </HStack>
+          <FormControl display={"flex"}>
+            <FormLabel htmlFor="isRequired">
+              Revoke Update (Immutable)
+            </FormLabel>
+            <Switch
+              id="isRequired"
+              isRequired
+              onChange={(e) => setRevokeUpdate(e.target.checked)}
             />
-            <FormErrorMessage>Description is required</FormErrorMessage>
           </FormControl>
-          <Button colorScheme="blue" onClick={() => handleCreateToken()}>
+          <Button colorScheme="green" onClick={() => handleCreateToken()}>
             Create Token
           </Button>
         </VStack>

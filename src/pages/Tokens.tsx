@@ -3,14 +3,13 @@ import { useToast } from "@chakra-ui/react";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { PublicKey, Transaction } from "@solana/web3.js";
 import {
-  TOKEN_PROGRAM_ID,
-  AccountLayout,
   getMint,
   createSetAuthorityInstruction,
   AuthorityType,
 } from "@solana/spl-token";
 import { RevokeAuthority } from "../components/Revoke";
-import { VStack } from "@chakra-ui/react";
+import { VStack, Box, Container, Flex, Heading, Text } from "@chakra-ui/react";
+import { getAssetsByAuthority } from "../utils/getMetaData";
 
 enum Option {
   Freeze,
@@ -34,7 +33,7 @@ const Tokens = () => {
       title: "Notification",
       description: message,
       status: status, // Can be "success", "error", "warning", or "info"
-      duration: 2000,
+      duration: 5000,
       isClosable: true,
       position: "top", // Can be any valid position
     });
@@ -53,32 +52,13 @@ const Tokens = () => {
     }
   }, [wallet]);
   const getTokens = async () => {
-    const tokenAccounts = await connection.getTokenAccountsByOwner(
-      wallet.publicKey,
-      {
-        programId: TOKEN_PROGRAM_ID,
-      }
-    );
-
-    const tokens = [];
-    tokenAccounts.value.forEach((tokenAccount) => {
-      const accountData = AccountLayout.decode(tokenAccount.account.data);
-      tokens.push(accountData.mint.toBase58());
-    });
     let mintAuthorityList = [],
       freezeAuthorityList = [];
-    for (const item of tokens) {
-      const mintInfo = await getMint(connection, new PublicKey(item));
-
-      if (mintInfo.mintAuthority) {
-        if (mintInfo.mintAuthority.toBase58() == wallet.publicKey.toBase58()) {
-          mintAuthorityList.push(mintInfo.address.toBase58());
-        }
-      }
-      if (mintInfo.freezeAuthority) {
-        if (mintInfo.freezeAuthority.toBase58() == wallet.publicKey.toBase58())
-          freezeAuthorityList.push(mintInfo.address.toBase58());
-      }
+    console.log(wallet.publicKey.toBase58());
+    const data = await getAssetsByAuthority(wallet.publicKey.toBase58());
+    for (let i = 0; i < data.items.length; i++) {
+      mintAuthorityList.push(data.items[i].id);
+      freezeAuthorityList.push(data.items[i].id);
     }
     setMintAuthority(mintAuthorityList);
     setfreezeAuthority(freezeAuthorityList);
@@ -130,33 +110,69 @@ const Tokens = () => {
   };
 
   return (
-    <>
-      <VStack spacing="4y">
-        <RevokeAuthority
-          title={"Revoke Mint Authority"}
-          subTitle={
-            "Revoking mint authority ensures that there can be no more tokens minted than the total supply. This provides security and peace of mind to buyers."
-          }
-          button={"Revoke Mint Authority"}
-          onSelectToken={setRevokeMintToken}
-          onRevokeAuthority={() => revoke(Option.Mint)}
-          selectedToken={revokeMintToken}
-          tokenList={mintAuthority}
-        ></RevokeAuthority>
+    <Container maxW={"full"} paddingX={130}>
+      <Box
+        p={4}
+        borderRadius="2xl"
+        boxShadow="dark-lg"
+        paddingX={"100px"}
+        paddingBottom={"30px"}
+      >
+        <Flex
+          as="nav"
+          align="center"
+          justify="space-between"
+          wrap="wrap"
+          paddingY="1.5"
+          paddingX="6"
+          boxShadow="sm"
+          borderRadius="lg"
+          marginBottom="20px"
+        >
+          <Flex align="center" mr={5}>
+            <Heading as="h1" size="lg" letterSpacing={"tighter"}>
+              Revoke Authority
+            </Heading>
+          </Flex>
 
-        <RevokeAuthority
-          title={"Revoke Freeze Authority"}
-          subTitle={
-            "If you want to create a liquidity pool you will need to 'Revoke Freeze Authority' of the Token, you can do that here."
-          }
-          button={"Revoke Freeze Authority"}
-          onSelectToken={setRevokeFreezeToken}
-          onRevokeAuthority={() => revoke(Option.Freeze)}
-          selectedToken={revokeFreezeToken}
-          tokenList={freezeAuthority}
-        ></RevokeAuthority>
-      </VStack>
-    </>
+          <Text fontSize="md">
+            Begin the seamless process of revoke your SPL token's authority
+          </Text>
+        </Flex>
+        <VStack
+          spacing={4}
+          p={5}
+          borderRadius="lg"
+          boxShadow="md"
+          width="100%"
+          alignItems="stretch"
+        >
+          <RevokeAuthority
+            title={"Revoke Mint Authority"}
+            subTitle={
+              "Revoking mint authority ensures that there can be no more tokens minted than the total supply. This provides security and peace of mind to buyers."
+            }
+            button={"Revoke Mint Authority"}
+            onSelectToken={setRevokeMintToken}
+            onRevokeAuthority={() => revoke(Option.Mint)}
+            selectedToken={revokeMintToken}
+            tokenList={mintAuthority}
+          ></RevokeAuthority>
+
+          <RevokeAuthority
+            title={"Revoke Freeze Authority"}
+            subTitle={
+              "If you want to create a liquidity pool you will need to 'Revoke Freeze Authority' of the Token, you can do that here."
+            }
+            button={"Revoke Freeze Authority"}
+            onSelectToken={setRevokeFreezeToken}
+            onRevokeAuthority={() => revoke(Option.Freeze)}
+            selectedToken={revokeFreezeToken}
+            tokenList={freezeAuthority}
+          ></RevokeAuthority>
+        </VStack>
+      </Box>
+    </Container>
   );
 };
 export default Tokens;
