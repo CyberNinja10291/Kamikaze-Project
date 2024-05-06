@@ -19,21 +19,21 @@ const theme = extendTheme({ colors });
 function App() {
   return (
     <>
-      <ChakraProvider theme={theme}>
-        <ContextProvider>
-          <Navbar />
-          <div style={{ padding: 30 }}>
-            <Router>
+      <Router>
+        <ChakraProvider theme={theme}>
+          <ContextProvider>
+            <Navbar />
+            <div style={{ padding: 30 }}>
               <Routes>
                 <Route path="/" element={<TokenCreator />} />
                 <Route path="/tokens/create" element={<TokenCreator />} />
                 <Route path="/tokens" element={<Tokens />} />
                 <Route path="/tokens/manage" element={<TokenManager />} />
               </Routes>
-            </Router>
-          </div>
-        </ContextProvider>
-      </ChakraProvider>
+            </div>
+          </ContextProvider>
+        </ChakraProvider>
+      </Router>
     </>
   );
 }
