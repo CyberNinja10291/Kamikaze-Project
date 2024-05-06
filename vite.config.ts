@@ -1,11 +1,22 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import { NodeGlobalsPolyfillPlugin } from "@esbuild-plugins/node-globals-polyfill";
-import { NodeModulesPolyfillPlugin } from "@esbuild-plugins/node-modules-polyfill";
-import rollupNodePolyFill from "rollup-plugin-node-polyfills";
 import { nodePolyfills } from "vite-plugin-node-polyfills";
 export default defineConfig({
-  plugins: [nodePolyfills(), react()],
+  plugins: [
+    nodePolyfills({
+      exclude: ["fs"],
+      // Whether to polyfill specific globals.
+      globals: {
+        Buffer: true,
+        global: true,
+        process: true,
+      },
+      // Whether to polyfill `node:` protocol imports.
+      protocolImports: true,
+    }),
+    react(),
+  ],
   server: {
     host: "127.0.0.1",
   },
@@ -15,16 +26,15 @@ export default defineConfig({
   resolve: {
     alias: {
       // Provide aliases for node modules
-      stream: "stream-browserify",
       crypto: "crypto-browserify",
       zlib: "browserify-zlib",
+      process: "process/browser",
+      path: "path-browserify",
+      os: "os-browserify",
+      stream: "stream-browserify",
     },
   },
   optimizeDeps: {
-    // disabled: false,
-    // esbuildOptions: {
-    //   plugins: [NodeGlobalsPolyfillPlugin()],
-    // },
     esbuildOptions: {
       target: "es2020",
       // Node.js global to browser globalThis
@@ -37,34 +47,19 @@ export default defineConfig({
           // process: true,
           buffer: true,
         }),
-        // NodeModulesPolyfillPlugin(),
       ],
     },
   },
-  build: {
-    reportCompressedSize: true,
-    // outDir: "build",
-    sourcemap: true,
-    chunkSizeWarningLimit: 99999,
-    // rollupOptions: {
-    //   external: ["@datadog/browser-rum"],
-    // },
-    commonjsOptions: {
-      transformMixedEsModules: true,
-    },
-  },
   // build: {
+  //   reportCompressedSize: true,
+  //   // outDir: "build",
+  //   sourcemap: true,
+  //   chunkSizeWarningLimit: 99999,
+  //   // rollupOptions: {
+  //   //   external: ["@datadog/browser-rum"],
+  //   // },
   //   commonjsOptions: {
-  //     include: [],
-  //   },
-  // },
-  // build: {
-  //   rollupOptions: {
-  //     plugins: [
-  //       // Enable rollup polyfills plugin
-  //       // used during production bundling
-  //       rollupNodePolyFill(),
-  //     ],
+  //     transformMixedEsModules: true,
   //   },
   // },
 });
