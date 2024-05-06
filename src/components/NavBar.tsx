@@ -2,6 +2,7 @@ import { useState } from "react";
 import { WalletMultiButton } from "@solana/wallet-adapter-react-ui";
 import { Box, Flex, Link, useColorModeValue } from "@chakra-ui/react";
 import { HamburgerIcon } from "@chakra-ui/icons";
+import { Link as ReactRouterLink } from "react-router-dom";
 
 const Navbar = () => {
   // These colors can be adjusted based on your theme
@@ -29,13 +30,13 @@ const Navbar = () => {
         alignItems={"center"}
         display={{ md: "block", base: "none" }}
       >
-        <Link href="/tokens/create" px={3}>
+        <Link to="/tokens/create" px={3} as={ReactRouterLink}>
           Create Token
         </Link>
-        <Link href="/tokens" px={3}>
+        <Link to="/tokens" px={3} as={ReactRouterLink}>
           Tokens
         </Link>
-        <Link href="/tokens/manage" px={3}>
+        <Link to="/tokens/manage" px={3} as={ReactRouterLink}>
           Manage Token
         </Link>
         <WalletMultiButton
