@@ -36,6 +36,7 @@ import {
   Text,
   Switch,
   Spinner,
+  Image,
 } from "@chakra-ui/react";
 import { AttachmentIcon } from "@chakra-ui/icons";
 // import { notify } from "../utils/notifications";
@@ -381,17 +382,13 @@ function TokenCreator() {
               alignItems={"center"}
               justifyContent={"center"}
               display={"flex"}
-              height={"200px"}
+              height={{ base: "200px", md: "300px" }}
               margin={"0"}
             >
               {!imagePreview ? (
                 <AttachmentIcon />
               ) : (
-                <img
-                  src={imagePreview}
-                  width={"150px"}
-                  style={{ maxHeight: "100%" }}
-                />
+                <Image src={imagePreview} width={"250px"} maxHeight={"100%"} />
               )}
             </FormLabel>
           </FormControl>
@@ -399,7 +396,7 @@ function TokenCreator() {
             <FormLabel>Description(Optional)</FormLabel>
             <Textarea
               placeholder="Put the description of the Token"
-              height={"200px"}
+              height={{ base: "200px", md: "300px" }}
               onChange={(e) => setDescription(e.target.value)}
             />
           </FormControl>
