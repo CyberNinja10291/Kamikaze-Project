@@ -61,13 +61,31 @@ const Navbar = () => {
           opacity={0.9}
           alignItems={"center"}
         >
-          <Link to="/tokens/create" px={3} as={ReactRouterLink}>
+          <Link
+            to="/tokens/create"
+            px={3}
+            width={"100%"}
+            as={ReactRouterLink}
+            onClick={() => setToggle(false)}
+          >
             Create Token
           </Link>
-          <Link to="/tokens" px={3} as={ReactRouterLink}>
+          <Link
+            to="/tokens"
+            px={3}
+            width={"100%"}
+            as={ReactRouterLink}
+            onClick={() => setToggle(false)}
+          >
             Tokens
           </Link>
-          <Link to="/tokens/manage" px={3} as={ReactRouterLink}>
+          <Link
+            to="/tokens/manage"
+            px={3}
+            width={"100%"}
+            as={ReactRouterLink}
+            onClick={() => setToggle(false)}
+          >
             Manage Token
           </Link>
           <WalletMultiButton
