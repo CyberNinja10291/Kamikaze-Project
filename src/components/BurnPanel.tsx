@@ -10,8 +10,6 @@ const BurnPanel = ({ tokenList, burnTokens, setBurnAmount }) => {
       marginLeft={"auto"}
       width={{ base: "100%", lg: "400px" }}
       minHeight={"100vh"}
-      borderColor={"white"}
-      border={"1px"}
       bg="#282828"
     >
       {tokenList.length == 0 ? (

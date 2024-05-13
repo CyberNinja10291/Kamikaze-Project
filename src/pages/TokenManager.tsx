@@ -208,8 +208,8 @@ const TokenManager = () => {
   return (
     <Container
       maxW={{ base: "100%", md: "100%" }}
-      border={"1px"}
-      borderColor={"yellow"}
+      borderTop={"1px"}
+      borderColor={"#494949"}
       color={"white"}
       paddingRight={"0px"}
     >

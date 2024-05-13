@@ -366,8 +366,8 @@ function TokenCreator() {
     <Container
       maxW={{ base: "100%", md: "full" }}
       padding={"20px 40px"}
-      border={"1px"}
-      borderColor={"yellow"}
+      borderTop={"1px"}
+      borderColor={"#494949"}
       color={"#AFAFAF"}
     >
       <Box
