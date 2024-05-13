@@ -1,22 +1,20 @@
 import { useState, useEffect } from "react";
-import { useToast, Container } from "@chakra-ui/react";
+import { useToast, Container, SimpleGrid, Spinner } from "@chakra-ui/react";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { PublicKey, Transaction } from "@solana/web3.js";
 import {
-  DataV2,
-  createUpdateMetadataAccountV2Instruction,
-} from "@metaplex-foundation/mpl-token-metadata";
-
-import { findMetadataPda } from "@metaplex-foundation/js";
-import {
-  Text,
   Box,
   Button,
-  Select,
   Input,
   Heading,
   Flex,
+  InputGroup,
+  InputLeftElement,
+  Text,
+  CloseButton,
 } from "@chakra-ui/react";
+import ProgressBar from "../components/ProgressBar";
+import { SearchIcon, CheckCircleIcon, CloseIcon } from "@chakra-ui/icons";
 import {
   TOKEN_PROGRAM_ID,
   AccountLayout,
@@ -25,39 +23,56 @@ import {
   createBurnCheckedInstruction,
 } from "@solana/spl-token";
 import { getAsset } from "../utils/getMetaData";
+import TokenCard from "../components/TokenCard";
+import BurnPanel from "../components/BurnPanel";
 const TokenManager = () => {
   const { connection } = useConnection();
   const wallet = useWallet();
   const toast = useToast();
   const [account, setAccount] = useState("");
   const [tokenList, setTokenList] = useState([]);
-  const [selectedToken, setSelectedToken] = useState("");
-  const [selectedTokenAmount, setSelectedTokenAmount] = useState(0);
-  const [selectedTokenName, setSelectedTokenName] = useState("");
-  const [selectedTokenSymbol, setSelectedTokenSymbol] = useState("");
+  const [searchWord, setSearchWord] = useState("");
 
-  const [tokenName, setTokenName] = useState("");
-  const [tokenSymol, setTokenSymol] = useState("");
-  const [metadataUrl, setMetadataUrl] = useState("");
-  const [burnAmount, setBurnAmount] = useState("");
-
-  const NotifyMessage = (
-    message: string,
-    status: "success" | "error" | "warning" | "info" = "info"
-  ) => {
+  const showToast = (title, info, Icon, duration) => {
     toast({
-      title: "Notification",
-      description: message,
-      status: status, // Can be "success", "error", "warning", or "info"
-      duration: 5000,
+      position: "bottom-right",
+      duration: duration,
       isClosable: true,
-      position: "top", // Can be any valid position
+      render: ({ onClose }) => (
+        <Box
+          alignItems="center"
+          bg="#BB2ADD" // Custom background color
+          color="white"
+          borderRadius="md"
+          boxShadow="md"
+          width={"350px"}
+        >
+          <Box
+            display={"flex"}
+            width={"100%"}
+            justifyContent={"space-around"}
+            alignItems={"center"}
+            paddingY={"10px"}
+            minHeight={"60px"}
+          >
+            <Icon boxSize="6" mr="3"></Icon>
+            <Box mr="5">
+              <strong>{title}</strong>
+              <Text fontSize="15px">{info}</Text>
+            </Box>
+            <CloseButton size="sm" onClick={onClose} />
+          </Box>
+          {Icon != Spinner && (
+            <ProgressBar duration={duration} onClose={onClose} />
+          )}
+        </Box>
+      ),
     });
   };
   useEffect(() => {
     if (wallet && wallet.connected) {
       if (wallet.publicKey.toBase58() != account) {
-        setAccount(account);
+        setAccount(wallet.publicKey.toBase58());
         getTokens();
       }
     } else {
@@ -66,13 +81,6 @@ const TokenManager = () => {
     }
   }, [wallet]);
 
-  const selectTokenHanlder = async (token: string) => {
-    setSelectedToken(token);
-    const result = tokenList.find((item) => item.token == token);
-    setSelectedTokenAmount(result.amount / 10 ** result.decimals);
-    setSelectedTokenName(result.name);
-    setSelectedTokenSymbol(result.symbol);
-  };
   const getTokens = async () => {
     const tokenAccounts = await connection.getTokenAccountsByOwner(
       wallet.publicKey,
@@ -80,207 +88,223 @@ const TokenManager = () => {
         programId: TOKEN_PROGRAM_ID,
       }
     );
-    console.log(tokenAccounts.value.length);
     const tokenAddresses = tokenAccounts.value.map((data) =>
       AccountLayout.decode(data.account.data).mint.toBase58()
     );
-    console.log("tokenAddresses", tokenAddresses);
+    const tokenAmounts = tokenAccounts.value.map((data) =>
+      Number(AccountLayout.decode(data.account.data).amount)
+    );
     const tokenDatas = await getAsset(tokenAddresses);
-    console.log(tokenDatas);
     const tokens = [];
     for (let i = 0; i < tokenDatas.length; i++) {
       const isMutable = tokenDatas[i].mutable;
       const metaData = tokenDatas[i].content.metadata;
       const tokenInfo = tokenDatas[i].token_info;
-      if (!isMutable) continue;
+      const imageUrl = tokenDatas[i].content.links.image;
       tokens.push({
         token: tokenAddresses[i],
-        amount: Number(tokenInfo.supply),
+        amount: tokenAmounts[i],
         name: metaData.name,
         symbol: metaData.symbol,
         decimals: Number(tokenInfo.decimals),
+        imageUrl,
+        tokenUrl: "https://solscan.io/token/" + tokenAddresses[i],
+        selected: false,
+        burnAmount: 0,
+        immutable: !isMutable,
+        freezeAuthority: tokenInfo.freeze_authority == null,
+        mintAuthority: tokenInfo.mint_authority == null,
       });
     }
     setTokenList(tokens);
   };
 
-  const update = async () => {
-    if (!wallet || !wallet.connected) {
-      NotifyMessage("Connect the Wallet", "warning");
-      return;
-    }
-    if (!tokenName || !tokenSymol || !metadataUrl || !selectedToken) {
-      console.log("Fill all fields");
-      NotifyMessage("Fill the token info", "warning");
-      return;
-    }
-    const from = wallet;
-
-    const mint = new PublicKey(selectedToken);
-    const metadataPDA = await findMetadataPda(mint);
-    const tokenMetadata = {
-      name: tokenName,
-      symbol: tokenSymol,
-      uri: metadataUrl,
-      sellerFeeBasisPoints: 0,
-      creators: null,
-      collection: null,
-      uses: null,
-    } as DataV2;
-
-    const updateMetadataTransaction = new Transaction().add(
-      createUpdateMetadataAccountV2Instruction(
-        {
-          metadata: metadataPDA,
-          updateAuthority: from.publicKey,
-        },
-        {
-          updateMetadataAccountArgsV2: {
-            data: tokenMetadata,
-            updateAuthority: from.publicKey,
-            primarySaleHappened: true,
-            isMutable: false,
-          },
+  const setBurnAmount = async (tokenAddress: string, burnAmount: number) => {
+    setTokenList((tokenList) => {
+      const updatedTokenInfoArray = tokenList.map((tokenInfo: any) => {
+        if (tokenInfo.token === tokenAddress) {
+          return { ...tokenInfo, ["burnAmount"]: burnAmount };
         }
-      )
-    );
-
-    try {
-      await wallet.sendTransaction(updateMetadataTransaction, connection, {
-        signers: [],
+        return tokenInfo;
       });
-      NotifyMessage("Successfully Updated!");
-    } catch (error) {
-      NotifyMessage("Failed");
-      console.log("error", error.message);
-    }
-  };
-
-  const burnTokens = async (token: string, amount: number) => {
-    if (!wallet || !wallet.connected) {
-      NotifyMessage("Connect the Wallet", "warning");
-      return;
-    }
-    if (!burnAmount) {
-      NotifyMessage("Fill the burn amount!", "warning");
-      return;
-    }
-    const account = await getAssociatedTokenAddress(
-      new PublicKey(token),
-      wallet.publicKey
-    );
-
-    const mintInfo = await getMint(connection, new PublicKey(token));
-    if (selectedTokenAmount < amount) {
-      NotifyMessage("Burn amount exceeds balance");
-      return;
-    }
-    const transaction = new Transaction().add(
-      createBurnCheckedInstruction(
-        account, // PublicKey of Owner's Associated Token Account
-        new PublicKey(token), // Public Key of the Token Mint Address
-        wallet.publicKey, // Public Key of Owner's Wallet
-        amount * 10 ** mintInfo.decimals, // Number of tokens to burn
-        mintInfo.decimals // Number of Decimals of the Token Mint
-      )
-    );
-
-    await wallet.sendTransaction(transaction, connection, {
-      signers: [],
+      return updatedTokenInfoArray;
     });
-
-    setSelectedTokenAmount(selectedTokenAmount - amount);
-    getTokens();
-    NotifyMessage("Successfully Burned");
   };
-
+  const burnTokens = async () => {
+    try {
+      const burnTokenList = tokenList.filter(
+        (item: any) => item.selected == true
+      );
+      let transaction = new Transaction();
+      for (let i = 0; i < burnTokenList.length; i++) {
+        const account = await getAssociatedTokenAddress(
+          new PublicKey(burnTokenList[i].token),
+          wallet.publicKey
+        );
+        const mintInfo = await getMint(
+          connection,
+          new PublicKey(burnTokenList[i].token)
+        );
+        if (burnTokenList[i].burnAmount != 0) {
+          transaction = transaction.add(
+            createBurnCheckedInstruction(
+              account, // PublicKey of Owner's Associated Token Account
+              new PublicKey(burnTokenList[i].token), // Public Key of the Token Mint Address
+              wallet.publicKey, // Public Key of Owner's Wallet
+              burnTokenList[i].burnAmount * 10 ** mintInfo.decimals, // Number of tokens to burn
+              mintInfo.decimals // Number of Decimals of the Token Mint
+            )
+          );
+        }
+      }
+      if (transaction.instructions.length != 0) {
+        showToast("Confirming Transaction", "", Spinner, null);
+        await wallet.sendTransaction(transaction, connection, {
+          signers: [],
+        });
+        toast.closeAll();
+        for (let i = 0; i < burnTokenList.length; i++) {
+          if (burnTokenList[i].burnAmount != 0) {
+            showToast(
+              "Burn Successful",
+              burnTokenList[i].burnAmount + burnTokenList[i].symbol + "BURNED",
+              CheckCircleIcon,
+              5000
+            );
+          }
+        }
+        getTokens();
+      } else {
+        showToast("No selected Token", "", CloseIcon, 5000);
+      }
+    } catch (error) {
+      toast.closeAll();
+      showToast("Transaction Failed", "", CloseIcon, 5000);
+    }
+  };
+  const selectToken = (tokenAddress: string, select: boolean) => {
+    setTokenList((tokenList) => {
+      // Make a copy of the array
+      const updatedTokenInfoArray = tokenList.map((tokenInfo: any) => {
+        // Find the token info object with the matching id
+        if (tokenInfo.token === tokenAddress) {
+          // Update the specified property with the new value
+          return { ...tokenInfo, ["selected"]: select };
+        }
+        return tokenInfo; // Return the unchanged token info object
+      });
+      return updatedTokenInfoArray; // Set the state with the updated array
+    });
+  };
+  const selectTokens = (select: boolean) => {
+    setTokenList((tokenList) => {
+      // Make a copy of the array
+      const updatedTokenInfoArray = tokenList.map((tokenInfo: any) => {
+        return { ...tokenInfo, ["selected"]: select };
+      });
+      return updatedTokenInfoArray;
+    });
+  };
   return (
-    <Container maxW={{ base: "100%", md: "full" }} p={{ base: 2, md: 1 }}>
-      <Box
-        p={4}
-        borderRadius="2xl"
-        boxShadow="dark-lg"
-        paddingX={"5%"}
-        paddingBottom={"30px"}
-      >
-        <Flex
-          as="nav"
-          align="center"
-          justify="space-between"
-          wrap="wrap"
-          paddingY="1.5"
-          paddingX="6"
-          boxShadow="sm"
-          borderRadius="lg"
-          marginBottom="20px"
-        >
-          <Flex align="center" mr={5}>
-            <Heading as="h1" size="lg" letterSpacing={"tighter"}>
-              Manage SPL token
-            </Heading>
+    <Container
+      maxW={{ base: "100%", md: "100%" }}
+      border={"1px"}
+      borderColor={"yellow"}
+      color={"white"}
+      paddingRight={"0px"}
+    >
+      <Flex display={{ lg: "flex" }}>
+        <Box fontFamily={"Arial"} width={"100%"} padding={"20px 20px"}>
+          <Flex
+            align={"left"}
+            flexDirection={"column"}
+            marginBottom="20px"
+            color={"white"}
+          >
+            <Box>
+              <Heading
+                letterSpacing={"tighter"}
+                fontFamily={"Arial"}
+                textAlign={"left"}
+              >
+                Manage Tokens
+              </Heading>
+            </Box>
+            <Flex
+              justifyContent={"space-between"}
+              display={{ md: "flex", base: "block" }}
+            >
+              <Flex>
+                <Button
+                  color={"white"}
+                  borderRadius={"20px"}
+                  bg={"#282828"}
+                  marginRight={"10px"}
+                  onClick={() => selectTokens(true)}
+                >
+                  Select All Tokens
+                </Button>
+                <Button
+                  color={"white"}
+                  borderRadius={"20px"}
+                  bg={"#282828"}
+                  onClick={() => selectTokens(false)}
+                >
+                  Deselect All Tokens
+                </Button>
+              </Flex>
+              <Box>
+                <InputGroup>
+                  <InputLeftElement pointerEvents="none">
+                    <SearchIcon color="gray.300" />
+                  </InputLeftElement>
+                  <Input
+                    type="text"
+                    placeholder="Search LP token address..."
+                    borderRadius={"100px"}
+                    width={"350px"}
+                    onChange={(e) => setSearchWord(e.target.value)}
+                  />
+                </InputGroup>
+              </Box>
+            </Flex>
           </Flex>
-
-          <Text fontSize="md" display={{ base: "none", md: "block" }}>
-            Begin the seamless process of updating your SPL token's metadata to
-            ensure that your token's information remains accurate and up to date
-            with the latest details
-          </Text>
-        </Flex>
-        <Flex flexDirection={"column"} gap={4}>
-          <Select
-            placeholder="Select Token"
-            value={selectedToken}
-            onChange={(e) => selectTokenHanlder(e.target.value)}
-            variant="filled"
-            color="purple.700"
+          <SimpleGrid
+            columns={{ base: 1, md: 3 }}
+            spacing={8}
+            marginBottom={"30px"}
           >
-            {tokenList.map((item, key) => (
-              <option value={item.token} key={key}>
-                {item.token}
-              </option>
-            ))}
-          </Select>
-          <Input
-            placeholder="Type your new token name"
-            onChange={(e) => setTokenName(e.target.value)}
-          ></Input>
-          <Input
-            placeholder="Type your new token symbol"
-            onChange={(e) => setTokenSymol(e.target.value)}
-          ></Input>
-          <Input
-            placeholder="Type your new meatdata Url"
-            onChange={(e) => setMetadataUrl(e.target.value)}
-          ></Input>
-          <Button colorScheme="green" variant="solid" onClick={update}>
-            Update
-          </Button>
-          <Text>Burn Tokens</Text>
-          <Box display={"flex"} justifyContent={"space-evenly"}>
-            <Text fontSize="md" color="purple.200">
-              Name: {selectedTokenName}
-            </Text>
-            <Text fontSize="md" color="purple.200">
-              Symbol: {selectedTokenSymbol}
-            </Text>
-            <Text fontSize="md" color="purple.200">
-              Balance: {selectedTokenAmount}
-            </Text>
-          </Box>
-          <Input
-            type="number"
-            placeholder="Type your token amount to burn"
-            onChange={(e) => setBurnAmount(e.target.value)}
-          ></Input>
-          <Button
-            colorScheme="green"
-            variant="solid"
-            onClick={() => burnTokens(selectedToken, Number(burnAmount))}
-          >
-            Burn
-          </Button>
-        </Flex>
-      </Box>
+            {tokenList.map(
+              (item, key) =>
+                (searchWord == "" || item.token.includes(searchWord)) && (
+                  <TokenCard
+                    key={key}
+                    tokenAddress={item.token}
+                    imageUrl={item.imageUrl}
+                    tokenName={item.name}
+                    tokenSymbol={item.symbol}
+                    tokenUrl={item.tokenUrl}
+                    amount={item.amount / 10 ** item.decimals}
+                    // price={getTokenPrice(item.token)}
+                    price={"0.01"}
+                    selected={item.selected}
+                    freezeAuthority={item.freezeAuthority}
+                    mintAuthority={item.mintAuthority}
+                    immutable={item.immutable}
+                    handleSelect={(option: boolean) => {
+                      selectToken(item.token, option);
+                    }}
+                  />
+                )
+            )}
+          </SimpleGrid>
+        </Box>
+        <BurnPanel
+          tokenList={tokenList.filter((item: any) => item.selected == true)}
+          burnTokens={burnTokens}
+          setBurnAmount={setBurnAmount}
+        />
+      </Flex>
     </Container>
   );
 };

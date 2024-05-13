@@ -1,13 +1,15 @@
 import { useState, useEffect } from "react";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { WebIrys } from "@irys/sdk";
-
-import { Stack, useToast } from "@chakra-ui/react";
+import { useToast } from "@chakra-ui/react";
+import { CheckCircleIcon, WarningIcon, CloseIcon } from "@chakra-ui/icons";
+import ProgressBar from "../components/ProgressBar";
 import {
   Keypair,
   SystemProgram,
   Transaction,
   PublicKey,
+  LAMPORTS_PER_SOL,
 } from "@solana/web3.js";
 import {
   MINT_SIZE,
@@ -17,7 +19,14 @@ import {
   getAssociatedTokenAddress,
   createAssociatedTokenAccountInstruction,
   createMintToInstruction,
+  createSetAuthorityInstruction,
+  AuthorityType,
 } from "@solana/spl-token";
+import websiteIcon from "../assets/website.svg";
+import twitterIcon from "../assets/twitter.svg";
+import telegramIcon from "../assets/telegram.svg";
+import discordIcon from "../assets/discord.svg";
+
 import {
   createCreateMetadataAccountV3Instruction,
   PROGRAM_ID,
@@ -35,11 +44,13 @@ import {
   Heading,
   Text,
   Switch,
-  Spinner,
   Image,
+  InputGroup,
+  InputLeftElement,
+  CloseButton,
+  Spinner,
 } from "@chakra-ui/react";
-import { AttachmentIcon } from "@chakra-ui/icons";
-// import { notify } from "../utils/notifications";
+import { Link } from "react-router-dom";
 function TokenCreator() {
   const toast = useToast();
   const wallet = useWallet();
@@ -48,6 +59,7 @@ function TokenCreator() {
 
   const [imageFile, setImageFile] = useState(null);
   const [imagePreview, setImagePreview] = useState(null);
+  const [imageFileName, setImageFileName] = useState("");
 
   const [tokenName, setTokenName] = useState("");
   const [tokenSymbol, setTokenSymbol] = useState("");
@@ -64,8 +76,8 @@ function TokenCreator() {
   const [discord, setDiscord] = useState("");
 
   const [revokeUpdate, setRevokeUpdate] = useState(false);
-  const [socialLink, setSocialLink] = useState(false);
-  const [loading, setLoading] = useState(false);
+  const [revokeMintAuthority, setRevokeMintAuthority] = useState(false);
+  const [revokeFreezeAuthority, setRevokeFreezeAuthority] = useState(false);
 
   useEffect(() => {
     if (wallet && wallet.connected) {
@@ -84,28 +96,12 @@ function TokenCreator() {
     }
   }, [wallet]);
 
-  const NotifyMessage = (
-    message: string,
-    status: "success" | "error" | "warning" | "info" = "info"
-  ) => {
-    toast({
-      title: "Notification",
-      description: message,
-      status: status, // Can be "success", "error", "warning", or "info"
-      duration: 5000,
-      isClosable: true,
-      position: "top", // Can be any valid position
-    });
-  };
   const handleCreateToken = async () => {
     try {
       if (!wallet || !wallet.connected) {
-        NotifyMessage("Connect the Wallet", "warning");
+        showToast("Fill the all of the fields", "", WarningIcon, 5000);
         return;
       }
-      console.log("Handle Create TOken");
-      console.log("connection", connection);
-      console.log("balance", await connection.getBalance(wallet.publicKey));
       if (
         !tokenName ||
         !tokenSymbol ||
@@ -114,13 +110,11 @@ function TokenCreator() {
         !description ||
         !imagePreview
       ) {
-        console.log("Notify");
-        NotifyMessage("Fill the all of the fields");
+        showToast("Fill the all of the fields", "", WarningIcon, 5000);
         return;
       }
-      setLoading(true);
+
       const info = await configureMetadata();
-      console.log("Info", info);
       const from = wallet;
       const mintKeypair = Keypair.generate();
       const tokenATA = await getAssociatedTokenAddress(
@@ -161,7 +155,7 @@ function TokenCreator() {
             },
           }
         );
-      const createNewTokenTransaction = new Transaction().add(
+      let createNewTokenTransaction = new Transaction().add(
         SystemProgram.createAccount({
           fromPubkey: from.publicKey,
           newAccountPubkey: mintKeypair.publicKey,
@@ -190,22 +184,43 @@ function TokenCreator() {
         ),
         createMetadataInstruction
       );
-      console.log("createNewTokenTransaction", createNewTokenTransaction);
+      if (revokeMintAuthority) {
+        createNewTokenTransaction.add(
+          createSetAuthorityInstruction(
+            mintKeypair.publicKey, // Token Mint Address
+            wallet.publicKey, // Current Authority
+            AuthorityType.MintTokens, // : AuthorityType.FreezeAccount, // New Authority (null disables minting)
+            null,
+            []
+          )
+        );
+      }
+      if (revokeFreezeAuthority) {
+        createNewTokenTransaction.add(
+          createSetAuthorityInstruction(
+            mintKeypair.publicKey, // Token Mint Address
+            wallet.publicKey, // Current Authority
+            AuthorityType.FreezeAccount, // New Authority (null disables minting)
+            null,
+            []
+          )
+        );
+      }
+      showToast("Confirming Transaction", "", Spinner, null);
       const tx = await sendTransaction(createNewTokenTransaction, connection, {
         signers: [mintKeypair],
       });
-      setLoading(false);
-
-      NotifyMessage(
-        `Created Token. Token address: ${mintKeypair.publicKey.toBase58()}`
-      );
+      toast.closeAll();
+      showToast("Token Created", "", CheckCircleIcon, 5000);
       console.log(
-        `Created Token. Token address: ${mintKeypair.publicKey.toBase58()}`
+        `Created Token. Token address: ${mintKeypair.publicKey.toBase58()} ${tx}`
       );
-      console.log("Transaction completed", tx);
     } catch (error) {
+      showToast("Transaction Failed", "", CloseIcon, 5000);
+      setTimeout(() => {
+        toast.closeAll();
+      }, 5000);
       console.log("error", error);
-      setLoading(false);
     }
   };
 
@@ -219,8 +234,8 @@ function TokenCreator() {
           const blob = new Blob([uint8array], { type: "image/png" });
           const preview = URL.createObjectURL(blob);
           setImagePreview(preview);
+          setImageFileName(files[0].name);
           setImageFile(Buffer.from(reader.result as ArrayBuffer));
-          console.log("ImageFile", imageFile);
         }
       };
       reader.readAsArrayBuffer(files[0]);
@@ -231,24 +246,30 @@ function TokenCreator() {
     data: Buffer,
     type: "image" | "json"
   ): Promise<string> => {
-    const network = "mainnet";
+    const network = "devnet";
     const token = "solana";
     // const rpcUrl = "https://api.devnet.solana.com"; // Required for devnet
     const rpcUrl =
-      "https://mainnet.helius-rpc.com/?api-key=ee528ad2-b235-4251-9cc1-a1cf7ec3e06e";
-    //   "https://devnet.helius-rpc.com/?api-key=ee528ad2-b235-4251-9cc1-a1cf7ec3e06e";
+      // "https://mainnet.helius-rpc.com/?api-key=ee528ad2-b235-4251-9cc1-a1cf7ec3e06e";
+      "https://devnet.helius-rpc.com/?api-key=ee528ad2-b235-4251-9cc1-a1cf7ec3e06e";
     // Create a wallet object
-    const wallet = { rpcUrl: rpcUrl, name: "ethersv5", provider: provider };
+    const webIryswallet = {
+      rpcUrl: rpcUrl,
+      name: "ethersv5",
+      provider: provider,
+    };
     // Use the wallet object
-    const webIrys = new WebIrys({ network, token, wallet });
+    const webIrys = new WebIrys({ network, token, wallet: webIryswallet });
     await webIrys.ready();
 
-    console.log("Size", data.length);
     const size = data.length;
 
     // fund (if needed)
     const price = await webIrys.getPrice(size);
-    await webIrys.fund(price);
+    const fundedAmount = await webIrys.getBalance(wallet.publicKey.toBase58());
+    if (fundedAmount < price) {
+      await webIrys.fund(LAMPORTS_PER_SOL);
+    }
 
     const value = type == "image" ? "image/png" : "application/json";
     const tx = await webIrys.upload(data, {
@@ -258,23 +279,25 @@ function TokenCreator() {
     console.log(
       `Upload success content URL= https://gateway.irys.xyz/${tx.id}`
     );
-    NotifyMessage(
-      `Upload success content URL= https://gateway.irys.xyz/${tx.id}`,
-      "success"
-    );
     return `https://gateway.irys.xyz/${tx.id}`;
   };
 
   const configureMetadata = async () => {
+    showToast("Uploading image", "", Spinner, null);
     const imageUrl = await uploadData(imageFile, "image");
+    toast.closeAll();
+    showToast(
+      "Token Symbol image upload successful",
+      "",
+      CheckCircleIcon,
+      null
+    );
 
     let extensions = {};
-    if (socialLink) {
-      if (website != "") extensions["website"] = website;
-      if (twitter != "") extensions["twitter"] = twitter;
-      if (telegram != "") extensions["telegram"] = telegram;
-      if (discord != "") extensions["discord"] = discord;
-    }
+    if (website != "") extensions["website"] = website;
+    if (twitter != "") extensions["twitter"] = twitter;
+    if (telegram != "") extensions["telegram"] = telegram;
+    if (discord != "") extensions["discord"] = discord;
 
     let content = {
       name: tokenName,
@@ -285,10 +308,12 @@ function TokenCreator() {
     if (Object.keys(extensions).length != 0) {
       content["extentions"] = extensions;
     }
-    console.log("content", content);
     const jsonContent = JSON.stringify(content, null, 4);
     const buffer = new TextEncoder().encode(jsonContent).buffer;
+    showToast("Uploading metadata", "", Spinner, null);
     const metadataUrl = await uploadData(Buffer.from(buffer), "json");
+    toast.closeAll();
+    showToast("Token metaData upload successful", "", CheckCircleIcon, 5000);
 
     console.log("imageUrl", imageUrl);
     console.log("metadataUrl", metadataUrl);
@@ -301,72 +326,125 @@ function TokenCreator() {
       amount: Number(amount),
     };
   };
+  const showToast = (title, info, Icon, duration) => {
+    toast({
+      position: "bottom-right",
+      duration: duration,
+      isClosable: true,
+      render: ({ onClose }) => (
+        <Box
+          alignItems="center"
+          bg="#BB2ADD" // Custom background color
+          color="white"
+          borderRadius="md"
+          boxShadow="md"
+          width={"350px"}
+        >
+          <Box
+            display={"flex"}
+            width={"100%"}
+            justifyContent={"space-around"}
+            alignItems={"center"}
+            paddingY={"10px"}
+            minHeight={"60px"}
+          >
+            <Icon boxSize="6" mr="3"></Icon>
+            <Box mr="5">
+              <strong>{title}</strong>
+              <Text fontSize="15px">{info}</Text>
+            </Box>
+            <CloseButton size="sm" onClick={onClose} />
+          </Box>
+          {Icon != Spinner && (
+            <ProgressBar duration={duration} onClose={onClose} />
+          )}
+        </Box>
+      ),
+    });
+  };
   return (
-    <Container maxW={{ base: "100%", md: "full" }} p={{ base: 2, md: 1 }}>
+    <Container
+      maxW={{ base: "100%", md: "full" }}
+      padding={"20px 40px"}
+      border={"1px"}
+      borderColor={"yellow"}
+      color={"#AFAFAF"}
+    >
       <Box
         p={4}
-        borderRadius="2xl"
+        borderRadius="5"
         boxShadow="dark-lg"
         paddingX={"5%"}
         paddingBottom={"30px"}
+        bg={"#282828"}
+        fontFamily={"Arial"}
       >
         <Flex
-          as="nav"
           align="center"
           justify="space-between"
-          wrap="wrap"
-          paddingY="1.5"
-          paddingX="6"
-          boxShadow="sm"
-          borderRadius="lg"
           marginBottom="20px"
+          color={"white"}
         >
-          <Flex align="center" mr={5}>
-            <Heading as="h1" size="lg" letterSpacing={"tighter"}>
+          <Flex flexDirection={"column"} alignItems={"start"}>
+            <Heading letterSpacing={"tighter"} fontFamily={"Arial"}>
               Solana Token Creator
             </Heading>
+            <Text fontSize="md" display={{ base: "none", md: "block" }}>
+              Easily Create your own Solana SPL Token in just a few steps.
+            </Text>
           </Flex>
-
-          <Text fontSize="md" display={{ base: "none", md: "block" }}>
-            The perfect tool to create Solana SPL tokens. Simple, user friendly,
-            and fast.
-          </Text>
+          <Link to={"/tokens/manage"}>
+            <Button
+              backgroundColor={"#BB2ADD"}
+              color={"white"}
+              borderRadius={"20px"}
+            >
+              Manage Tokens
+            </Button>
+          </Link>
         </Flex>
-        <SimpleGrid columns={{ base: 1, md: 2 }} spacing={4}>
+        <SimpleGrid
+          columns={{ base: 1, md: 2 }}
+          spacing={8}
+          marginBottom={"30px"}
+        >
           <FormControl>
-            <FormLabel>Name</FormLabel>
+            <FormLabel>Token name (e.g. Kamikaze STC)</FormLabel>
             <Input
-              placeholder="Name"
+              placeholder="Enter token name"
+              bg={"#2D2D2D"}
+              border={"0px"}
               onChange={(e) => setTokenName(e.target.value)}
             />
           </FormControl>
           <FormControl>
-            <FormLabel>Symbol</FormLabel>
+            <FormLabel>Token symbol (Max. 8 characters)</FormLabel>
             <Input
-              placeholder="Symbol"
+              placeholder="Enter token symbol"
+              bg={"#2D2D2D"}
+              border={"0px"}
               onChange={(e) => setTokenSymbol(e.target.value)}
-            />
-          </FormControl>
-          <FormControl>
-            <FormLabel>Decimals</FormLabel>
-            <Input
-              placeholder="Decimals"
-              type="number"
-              value={decimals}
-              onChange={(e) => setDecimals(e.target.value)}
-            />
-          </FormControl>
-          <FormControl>
-            <FormLabel>Supply</FormLabel>
-            <Input
-              placeholder="Supply"
-              type="number"
-              onChange={(e) => setAmount(e.target.value)}
             />
           </FormControl>
 
           <FormControl display={"flex"} flexDirection={"column"}>
-            <FormLabel>Image</FormLabel>
+            <FormLabel>Description(Optional)</FormLabel>
+            <Textarea
+              placeholder="Enter project description"
+              height={{ base: "200px", md: "300px" }}
+              bg={"#2D2D2D"}
+              border={"0px"}
+              onChange={(e) => setDescription(e.target.value)}
+              maxHeight={"150px"}
+              minHeight={"150px"}
+              paddingX={"16px"}
+              paddingY={"18px"}
+            />
+          </FormControl>
+          <FormControl display={"flex"} flexDirection={"column"}>
+            <FormLabel>
+              Symbol image (128x128 or larger is recommended)
+            </FormLabel>
             <Input
               type="file"
               accept="image/*" // Optionally, specify the types of images accepted
@@ -377,110 +455,253 @@ function TokenCreator() {
             />
             <FormLabel
               htmlFor="images"
-              border={"1px solid #A2A8A0"}
               borderRadius={"5px"}
               alignItems={"center"}
               justifyContent={"center"}
               display={"flex"}
-              height={{ base: "200px", md: "300px" }}
+              // height={{ base: "200px", md: "300px" }}
+              height={"150px"}
               margin={"0"}
+              bg={"#2D2D2D"}
+              border={"0px"}
             >
               {!imagePreview ? (
-                <AttachmentIcon />
+                <Flex
+                  flexDirection={"column"}
+                  alignItems={"center"}
+                  _hover={{
+                    cursor: "pointer",
+                    // textDecoration: "underline",
+                  }}
+                >
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="40"
+                    height="40"
+                    viewBox="0 0 40 40"
+                    fill="none"
+                  >
+                    <path
+                      d="M21.6663 31.6666V25H26.6663L19.9997 16.6666L13.333 25H18.333V31.6666H21.6663Z"
+                      fill="white"
+                    />
+                    <path
+                      d="M11.6663 31.6667H14.9997V28.3334H11.6663C8.90967 28.3334 6.66634 26.09 6.66634 23.3334C6.66634 20.9934 8.66467 18.74 11.1213 18.3084L12.0897 18.1384L12.4097 17.2084C13.5813 13.79 16.4913 11.6667 19.9997 11.6667C24.5947 11.6667 28.333 15.405 28.333 20V21.6667H29.9997C31.838 21.6667 33.333 23.1617 33.333 25C33.333 26.8384 31.838 28.3334 29.9997 28.3334H24.9997V31.6667H29.9997C33.6763 31.6667 36.6663 28.6767 36.6663 25C36.6638 23.5061 36.1607 22.056 35.2375 20.8814C34.3143 19.7068 33.0241 18.8755 31.573 18.52C30.8447 12.7834 25.933 8.33337 19.9997 8.33337C15.4063 8.33337 11.4163 11.0184 9.59467 15.25C6.01467 16.32 3.33301 19.7 3.33301 23.3334C3.33301 27.9284 7.07134 31.6667 11.6663 31.6667Z"
+                      fill="white"
+                    />
+                  </svg>
+                  <p>Upload an Image</p>
+                </Flex>
               ) : (
-                <Image src={imagePreview} width={"250px"} maxHeight={"100%"} />
+                <Box
+                  display={"flex"}
+                  flexDirection={"column"}
+                  justifyContent={"center"}
+                  alignItems={"center"}
+                  width={"100%"}
+                >
+                  <Box
+                    width={"100px"}
+                    height={"100px"}
+                    borderRadius={"50%"}
+                    overflow={"hidden"}
+                  >
+                    <Image
+                      width={"100%"}
+                      height={"100%"}
+                      objectFit={"cover"}
+                      src={imagePreview}
+                    />
+                  </Box>
+                  <Text
+                    color={"white"}
+                    align={"center"}
+                    whiteSpace={"nowrap"}
+                    width={"70%"}
+                    overflow={"hidden"}
+                    textOverflow={"ellipsis"}
+                  >
+                    {imageFileName}
+                  </Text>
+                  <Text align={"center"} fontSize={"12px"} color={"#AFAFAF"}>
+                    (Click to re-upload)
+                  </Text>
+                </Box>
               )}
             </FormLabel>
           </FormControl>
-          <FormControl display={"flex"} flexDirection={"column"}>
-            <FormLabel>Description(Optional)</FormLabel>
-            <Textarea
-              placeholder="Put the description of the Token"
-              height={{ base: "200px", md: "300px" }}
-              onChange={(e) => setDescription(e.target.value)}
+        </SimpleGrid>
+        <SimpleGrid columns={{ base: 1, md: 2 }} spacing={8}>
+          <SimpleGrid columns={{ base: 1, md: 1 }} spacing={8}>
+            <FormControl>
+              <FormLabel>Socials (Optional)</FormLabel>
+              <InputGroup>
+                <InputLeftElement pointerEvents="none">
+                  <img src={websiteIcon} />
+                </InputLeftElement>
+                {/* <Input type="tel" placeholder="Phone number" /> */}
+                <Input
+                  placeholder="Website URL"
+                  type="text"
+                  value={website}
+                  bg={"#2D2D2D"}
+                  border={"0px"}
+                  onChange={(e) => setWebsite(e.target.value)}
+                />
+              </InputGroup>
+            </FormControl>
+
+            <FormControl>
+              <InputGroup>
+                <InputLeftElement pointerEvents="none">
+                  <img src={twitterIcon} />
+                </InputLeftElement>
+                <Input
+                  placeholder="Twitter URL"
+                  type="text"
+                  value={twitter}
+                  bg={"#2D2D2D"}
+                  border={"0px"}
+                  onChange={(e) => setTwitter(e.target.value)}
+                />
+              </InputGroup>
+            </FormControl>
+
+            <FormControl>
+              <InputGroup>
+                <InputLeftElement pointerEvents="none">
+                  <img src={telegramIcon} />
+                </InputLeftElement>
+                <Input
+                  placeholder="Telegram Group URL"
+                  type="text"
+                  value={telegram}
+                  bg={"#2D2D2D"}
+                  border={"0px"}
+                  onChange={(e) => setTelegram(e.target.value)}
+                />
+              </InputGroup>
+            </FormControl>
+
+            <FormControl>
+              <InputGroup>
+                <InputLeftElement pointerEvents="none">
+                  <img src={discordIcon} />
+                </InputLeftElement>
+                <Input
+                  placeholder="Discord"
+                  type="text"
+                  value={discord}
+                  bg={"#2D2D2D"}
+                  border={"0px"}
+                  onChange={(e) => setDiscord(e.target.value)}
+                />
+              </InputGroup>
+            </FormControl>
+          </SimpleGrid>
+          <SimpleGrid columns={{ base: 1, md: 1 }} spacing={0}>
+            <FormControl>
+              <FormLabel>Token decimals (0~9)</FormLabel>
+              <Input
+                placeholder="Enter Token decimals"
+                type="number"
+                min={"0"}
+                max={"9"}
+                step={"1"}
+                value={decimals}
+                bg={"#2D2D2D"}
+                border={"0px"}
+                onChange={(e) =>
+                  setDecimals(Number(e.target.value) > 9 ? "9" : e.target.value)
+                }
+              />
+            </FormControl>
+            <FormControl>
+              <FormLabel>Token supply</FormLabel>
+              <Input
+                placeholder="Enter quantity of tokens to issue"
+                type="number"
+                bg={"#2D2D2D"}
+                border={"0px"}
+                marginBottom={"20px"}
+                onChange={(e) => setAmount(e.target.value)}
+              />
+              <Text align={"left"} fontSize={"14px"}>
+                Creation Fee: 0.15 SOL
+              </Text>
+            </FormControl>
+          </SimpleGrid>
+        </SimpleGrid>
+        <Text align={"left"} marginTop={"20px"}>
+          Advanced options
+        </Text>
+        <SimpleGrid
+          columns={{ sm: 1, md: 3 }}
+          spacing={3}
+          color={"white"}
+          marginY={"20px"}
+        >
+          <FormControl
+            display={"flex"}
+            justifyContent={"left"}
+            alignItems={"center"}
+          >
+            <FormLabel htmlFor="isRequired" marginBottom={"0"}>
+              Revoke Freeze Authority
+            </FormLabel>
+            <Text fontSize={"13px"}>(+0.1 SOL)</Text>
+            <Switch
+              id="isRequired"
+              marginLeft={"3"}
+              isRequired
+              onChange={(e) => setRevokeFreezeAuthority(e.target.checked)}
+            />
+          </FormControl>
+          <FormControl
+            display={"flex"}
+            justifyContent={"left"}
+            alignItems={"center"}
+          >
+            <FormLabel htmlFor="isRequired" marginBottom={"0"}>
+              Revoke Mint Authority
+            </FormLabel>
+            <Text fontSize={"13px"}>(+0.1 SOL)</Text>
+            <Switch
+              marginLeft={"3"}
+              id="isRequired"
+              isRequired
+              onChange={(e) => setRevokeMintAuthority(e.target.checked)}
+            />
+          </FormControl>
+          <FormControl
+            display={"flex"}
+            justifyContent={"left"}
+            alignItems={"center"}
+          >
+            <FormLabel htmlFor="isRequired" marginBottom={"0"}>
+              Immutable
+            </FormLabel>
+
+            <Text fontSize={"13px"}>(+0.1 SOL) </Text>
+            <Switch
+              marginLeft={"3"}
+              id="isRequired"
+              isRequired
+              onChange={(e) => setRevokeUpdate(e.target.checked)}
             />
           </FormControl>
         </SimpleGrid>
-        <FormControl display={"flex"}>
-          <FormLabel htmlFor="isRequired">Add Social Links :</FormLabel>
-          <Switch
-            id="isRequired"
-            isRequired
-            onChange={(e) => setSocialLink(e.target.checked)}
-          />
-        </FormControl>
-        {socialLink && (
-          <SimpleGrid columns={{ base: 1, md: 4 }} spacing={4}>
-            <FormControl>
-              <FormLabel>Website</FormLabel>
-              <Input
-                placeholder="Put your website"
-                type="text"
-                value={website}
-                onChange={(e) => setWebsite(e.target.value)}
-              />
-            </FormControl>
-            <FormControl>
-              <FormLabel>Twitter</FormLabel>
-              <Input
-                placeholder="Put your Twitter"
-                type="text"
-                value={twitter}
-                onChange={(e) => setTwitter(e.target.value)}
-              />
-            </FormControl>
-            <FormControl>
-              <FormLabel>Telegram</FormLabel>
-              <Input
-                placeholder="Put your telegram"
-                type="text"
-                value={telegram}
-                onChange={(e) => setTelegram(e.target.value)}
-              />
-            </FormControl>
-            <FormControl>
-              <FormLabel>Discord</FormLabel>
-              <Input
-                placeholder="Put your discord"
-                type="text"
-                value={discord}
-                onChange={(e) => setDiscord(e.target.value)}
-              />
-            </FormControl>
-          </SimpleGrid>
-        )}
-        <FormControl display={"flex"} marginY={"25px"}>
-          <FormLabel htmlFor="isRequired">Revoke Update (Immutable)</FormLabel>
-          <Switch
-            id="isRequired"
-            isRequired
-            onChange={(e) => setRevokeUpdate(e.target.checked)}
-          />
-        </FormControl>
-        <Button colorScheme="green" onClick={() => handleCreateToken()}>
+
+        <Button
+          marginY={"30px"}
+          backgroundColor={"#BB2ADD"}
+          borderRadius={"20px"}
+          color={"white"}
+          onClick={() => handleCreateToken()}
+        >
           Create Token
         </Button>
       </Box>
-      {loading && (
-        <Stack
-          width={"100%"}
-          height={"100%"}
-          position={"absolute"}
-          top={0}
-          left={0}
-          background={"#666666aa"}
-          alignItems={"center"}
-          pt={"40%"}
-        >
-          <Spinner
-            thickness="4px"
-            speed="0.65s"
-            emptyColor="gray.200"
-            color="blue.500"
-            size="xl"
-          />
-        </Stack>
-      )}
     </Container>
   );
 }

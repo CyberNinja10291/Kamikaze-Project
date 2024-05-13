@@ -1,13 +1,5 @@
 import { Box, Button, Select, Text, VStack } from "@chakra-ui/react";
 
-// Define the props type for the component
-// interface LiquidityPoolCreationProps {
-//   onRevokeAuthority: () => void; // You can define the correct type depending on your state management
-//   tokenOptions: string[]; // Replace with the actual type if you have a more complex structure
-//   selectedToken: string; // Replace with the correct type
-//   onSelectToken: (token: string) => void; // You can define the correct type depending on your state management
-// }
-
 export const RevokeAuthority = ({
   title,
   subTitle,

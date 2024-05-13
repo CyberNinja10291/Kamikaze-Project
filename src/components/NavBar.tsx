@@ -1,57 +1,52 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useWallet } from "@solana/wallet-adapter-react";
 import { WalletMultiButton } from "@solana/wallet-adapter-react-ui";
-import { Box, Flex, Link, useColorModeValue } from "@chakra-ui/react";
+import { Flex, Link, Image } from "@chakra-ui/react";
 import { HamburgerIcon } from "@chakra-ui/icons";
 import { Link as ReactRouterLink } from "react-router-dom";
+import logoIcon from "../assets/kamikaze.png";
 
 const Navbar = () => {
-  // These colors can be adjusted based on your theme
   const [toggleMenu, setToggle] = useState(false);
-  const bg = useColorModeValue("gray.800", "gray.900");
-  const color = useColorModeValue("white", "gray.200");
-
+  const wallet = useWallet();
+  useEffect(() => {
+    if (wallet && wallet.connected) {
+    } else {
+    }
+  }, [wallet]);
   return (
     <Flex
-      bg={bg}
-      color={color}
-      minH={"60px"}
-      py={{ base: 2 }}
-      px={{ base: 4 }}
-      align={"center"}
+      color={"white"}
+      py={"8px"}
+      px={{ md: "30px", base: "10px" }}
       justify={"space-between"}
+      alignItems={"center"}
+      borderBottom={"1px solid #A0A0A0"}
     >
-      <Flex align={"center"} mr={5}>
-        <Box ml={3} fontWeight="bold" fontSize={"xx-large"}>
-          Kamikaze
-        </Box>
+      <Flex alignItems={"center"} display={{ md: "flex", base: "none" }}>
+        <Link to="/tokens/create" px={7} as={ReactRouterLink}>
+          <Image src={logoIcon} minWidth={"100px"} />
+        </Link>
+        <Link to="/tokens/create" px={7} as={ReactRouterLink}>
+          Token Creator
+        </Link>
+        <Link to="/tokens/manage" px={7} as={ReactRouterLink}>
+          Manage Tokens
+        </Link>
       </Flex>
-      <Flex
-        justify={"space-between"}
-        alignItems={"center"}
-        display={{ md: "block", base: "none" }}
-      >
-        <Link to="/tokens/create" px={3} as={ReactRouterLink}>
-          Create Token
-        </Link>
-        <Link to="/tokens" px={3} as={ReactRouterLink}>
-          Tokens
-        </Link>
-        <Link to="/tokens/manage" px={3} as={ReactRouterLink}>
-          Manage Token
-        </Link>
-        <WalletMultiButton
-          style={{
-            backgroundColor: "#2b2b8f",
-          }}
-        />
-      </Flex>
+      <WalletMultiButton
+        style={{
+          backgroundColor: "#BB2ADD",
+          borderRadius: "20px",
+        }}
+      />
       {toggleMenu && (
         <Flex
           position={"absolute"}
           top={"64px"}
           direction={"column"}
           boxShadow={"md"}
-          background={"grey"}
+          background={"black"}
           p={3}
           gap={5}
           zIndex={10}
@@ -60,6 +55,7 @@ const Navbar = () => {
           right={0}
           opacity={0.9}
           alignItems={"center"}
+          display={{ md: "none", base: "flex" }}
         >
           <Link
             to="/tokens/create"
@@ -69,15 +65,6 @@ const Navbar = () => {
             onClick={() => setToggle(false)}
           >
             Create Token
-          </Link>
-          <Link
-            to="/tokens"
-            px={3}
-            width={"100%"}
-            as={ReactRouterLink}
-            onClick={() => setToggle(false)}
-          >
-            Tokens
           </Link>
           <Link
             to="/tokens/manage"
