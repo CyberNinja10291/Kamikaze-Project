@@ -1,6 +1,6 @@
 const url =
-  // "https://mainnet.helius-rpc.com/?api-key=ee528ad2-b235-4251-9cc1-a1cf7ec3e06e";
-  "https://devnet.helius-rpc.com/?api-key=ee528ad2-b235-4251-9cc1-a1cf7ec3e06e";
+  "https://mainnet.helius-rpc.com/?api-key=ee528ad2-b235-4251-9cc1-a1cf7ec3e06e";
+// ("https://devnet.helius-rpc.com/?api-key=ee528ad2-b235-4251-9cc1-a1cf7ec3e06e");
 
 import axios from "axios";
 
@@ -28,6 +28,7 @@ export const getAsset = async (tokens: string[]) => {
     return response.data.result;
   } catch (error) {
     console.error("Error:", error);
+    return [];
   }
 };
 

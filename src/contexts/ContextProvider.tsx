@@ -16,11 +16,11 @@ import { notify } from "../utils/notifications";
 const WalletContextProvider: FC<{ children: ReactNode }> = ({ children }) => {
   const { autoConnect } = useAutoConnect();
   // const network = WalletAdapterNetwork.Mainnet;
-  const network = WalletAdapterNetwork.Devnet;
+  const network = WalletAdapterNetwork.Mainnet;
   const endpoint = useMemo(
     () =>
-      // "https://mainnet.helius-rpc.com/?api-key=ee528ad2-b235-4251-9cc1-a1cf7ec3e06e",
-      "https://devnet.helius-rpc.com/?api-key=ee528ad2-b235-4251-9cc1-a1cf7ec3e06e",
+      "https://mainnet.helius-rpc.com/?api-key=ee528ad2-b235-4251-9cc1-a1cf7ec3e06e",
+    // "https://devnet.helius-rpc.com/?api-key=ee528ad2-b235-4251-9cc1-a1cf7ec3e06e",
     [network]
   );
   // const endpoint = useMemo(() => clusterApiUrl(network), [network]);

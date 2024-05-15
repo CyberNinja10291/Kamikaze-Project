@@ -21,23 +21,24 @@ const Navbar = () => {
       px={{ md: "30px", base: "10px" }}
       justify={"space-between"}
       alignItems={"center"}
-      borderBottom={"1px solid #A0A0A0"}
+      borderBottom="1px solid #606060"
     >
       <Flex alignItems={"center"} display={{ md: "flex", base: "none" }}>
         <Link to="/tokens/create" px={7} as={ReactRouterLink}>
           <Image src={logoIcon} minWidth={"100px"} />
         </Link>
-        <Link to="/tokens/create" px={7} as={ReactRouterLink}>
+        <Link to="/tokens/create" px="8px" as={ReactRouterLink}>
           Token Creator
         </Link>
-        <Link to="/tokens/manage" px={7} as={ReactRouterLink}>
+        <Link to="/tokens/manage" px="8px" as={ReactRouterLink}>
           Manage Tokens
         </Link>
       </Flex>
       <WalletMultiButton
         style={{
           backgroundColor: "#BB2ADD",
-          borderRadius: "20px",
+          borderRadius: "30px",
+          fontFamily: "Geist",
         }}
       />
       {toggleMenu && (

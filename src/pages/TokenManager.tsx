@@ -70,6 +70,7 @@ const TokenManager = () => {
     });
   };
   useEffect(() => {
+    console.log("connection", connection);
     if (wallet && wallet.connected) {
       if (wallet.publicKey.toBase58() != account) {
         setAccount(wallet.publicKey.toBase58());
@@ -82,41 +83,49 @@ const TokenManager = () => {
   }, [wallet]);
 
   const getTokens = async () => {
-    const tokenAccounts = await connection.getTokenAccountsByOwner(
-      wallet.publicKey,
-      {
-        programId: TOKEN_PROGRAM_ID,
+    try {
+      console.log("get TOkens");
+      const tokenAccounts = await connection.getTokenAccountsByOwner(
+        wallet.publicKey,
+        {
+          programId: TOKEN_PROGRAM_ID,
+        }
+      );
+      const tokenAddresses = tokenAccounts.value.map((data) =>
+        AccountLayout.decode(data.account.data).mint.toBase58()
+      );
+      const tokenAmounts = tokenAccounts.value.map((data) =>
+        Number(AccountLayout.decode(data.account.data).amount)
+      );
+      console.log("tokenaddresses", tokenAddresses);
+      const tokenDatas = await getAsset(tokenAddresses);
+      console.log("tokenDatas", tokenDatas);
+      if (tokenDatas.length == 0) return;
+      const tokens = [];
+      for (let i = 0; i < tokenDatas.length; i++) {
+        const isMutable = tokenDatas[i].mutable;
+        const metaData = tokenDatas[i].content.metadata;
+        const tokenInfo = tokenDatas[i].token_info;
+        const imageUrl = tokenDatas[i].content.links.image;
+        tokens.push({
+          token: tokenAddresses[i],
+          amount: tokenAmounts[i],
+          name: metaData.name,
+          symbol: metaData.symbol,
+          decimals: Number(tokenInfo.decimals),
+          imageUrl,
+          tokenUrl: "https://solscan.io/token/" + tokenAddresses[i],
+          selected: false,
+          burnAmount: 0,
+          immutable: !isMutable,
+          freezeAuthority: tokenInfo.freeze_authority == null,
+          mintAuthority: tokenInfo.mint_authority == null,
+        });
       }
-    );
-    const tokenAddresses = tokenAccounts.value.map((data) =>
-      AccountLayout.decode(data.account.data).mint.toBase58()
-    );
-    const tokenAmounts = tokenAccounts.value.map((data) =>
-      Number(AccountLayout.decode(data.account.data).amount)
-    );
-    const tokenDatas = await getAsset(tokenAddresses);
-    const tokens = [];
-    for (let i = 0; i < tokenDatas.length; i++) {
-      const isMutable = tokenDatas[i].mutable;
-      const metaData = tokenDatas[i].content.metadata;
-      const tokenInfo = tokenDatas[i].token_info;
-      const imageUrl = tokenDatas[i].content.links.image;
-      tokens.push({
-        token: tokenAddresses[i],
-        amount: tokenAmounts[i],
-        name: metaData.name,
-        symbol: metaData.symbol,
-        decimals: Number(tokenInfo.decimals),
-        imageUrl,
-        tokenUrl: "https://solscan.io/token/" + tokenAddresses[i],
-        selected: false,
-        burnAmount: 0,
-        immutable: !isMutable,
-        freezeAuthority: tokenInfo.freeze_authority == null,
-        mintAuthority: tokenInfo.mint_authority == null,
-      });
+      setTokenList(tokens);
+    } catch (error) {
+      console.log("error", error);
     }
-    setTokenList(tokens);
   };
 
   const setBurnAmount = async (tokenAddress: string, burnAmount: number) => {
@@ -208,10 +217,10 @@ const TokenManager = () => {
   return (
     <Container
       maxW={{ base: "100%", md: "100%" }}
-      borderTop={"1px"}
-      borderColor={"#494949"}
-      color={"white"}
-      paddingRight={"0px"}
+      color="white"
+      paddingRight="0px"
+      paddingLeft="50px"
+      marginTop="60px"
     >
       <Flex display={{ lg: "flex" }}>
         <Box fontFamily={"Arial"} width={"100%"} padding={"20px 20px"}>
@@ -231,6 +240,7 @@ const TokenManager = () => {
               </Heading>
             </Box>
             <Flex
+              marginTop="48px"
               justifyContent={"space-between"}
               display={{ md: "flex", base: "block" }}
             >
@@ -256,13 +266,15 @@ const TokenManager = () => {
               <Box>
                 <InputGroup>
                   <InputLeftElement pointerEvents="none">
-                    <SearchIcon color="gray.300" />
+                    <SearchIcon color="#494949" />
                   </InputLeftElement>
                   <Input
                     type="text"
                     placeholder="Search LP token address..."
                     borderRadius={"100px"}
                     width={"350px"}
+                    bg="#2D2D2D"
+                    border="0px"
                     onChange={(e) => setSearchWord(e.target.value)}
                   />
                 </InputGroup>
